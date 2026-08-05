@@ -1,0 +1,50 @@
+name: AirBridge 5G CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  go-backend:
+    name: Go Backend Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Run Go Unit Tests
+        run: |
+          cd core/go
+          go test -v ./... -coverprofile=coverage.out
+
+      - name: Verify Go Build
+        run: |
+          cd core/go
+          go build -v ./cmd/securemesh-node
+
+  flutter-app:
+    name: Flutter Polymorphic UI Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: |
+          cd apps/airbridge_5g
+          flutter pub get
+
+      - name: Run Flutter Tests
+        run: |
+          cd apps/airbridge_5g
+          flutter test --coverage

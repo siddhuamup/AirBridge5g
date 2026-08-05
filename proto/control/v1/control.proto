@@ -1,0 +1,226 @@
+syntax = "proto3";
+
+package airbridge.control.v1;
+
+option go_package = "github.com/example/securemesh/core/proto/control/v1;controlv1";
+
+// ControlPlane manages the AirBridge 5G daemon lifecycle.
+service ControlPlane {
+  // Node lifecycle
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc StartTunnel(StartTunnelRequest) returns (StartTunnelResponse);
+  rpc StopTunnel(StopTunnelRequest) returns (StopTunnelResponse);
+
+  // Peer management
+  rpc ListPeers(ListPeersRequest) returns (ListPeersResponse);
+  rpc ConnectPeer(ConnectPeerRequest) returns (ConnectPeerResponse);
+  rpc DisconnectPeer(DisconnectPeerRequest) returns (DisconnectPeerResponse);
+
+  // Role management
+  rpc SetRole(SetRoleRequest) returns (SetRoleResponse);
+  rpc GetRole(GetRoleRequest) returns (GetRoleResponse);
+
+  // QR credential exchange
+  rpc GenerateQRCredentials(GenerateQRRequest) returns (GenerateQRResponse);
+  rpc ImportQRCredentials(ImportQRRequest) returns (ImportQRResponse);
+
+  // Real-time traffic statistics (for UI graphs)
+  rpc GetTrafficStats(GetTrafficStatsRequest) returns (GetTrafficStatsResponse);
+  rpc StreamTrafficStats(StreamTrafficStatsRequest) returns (stream TrafficStatsUpdate);
+
+  // Privacy engine statistics
+  rpc GetPrivacyStats(GetPrivacyStatsRequest) returns (GetPrivacyStatsResponse);
+}
+
+// === Enums ===
+
+enum NodeRole {
+  NODE_ROLE_UNSPECIFIED = 0;
+  NODE_ROLE_MASTER = 1;    // Provider: shares internet connection
+  NODE_ROLE_CLIENT = 2;    // Receiver: consumes shared connection
+}
+
+enum TunnelState {
+  TUNNEL_STATE_UNSPECIFIED = 0;
+  TUNNEL_STATE_STOPPED = 1;
+  TUNNEL_STATE_STARTING = 2;
+  TUNNEL_STATE_RUNNING = 3;
+  TUNNEL_STATE_DEGRADED = 4;
+}
+
+// === Status ===
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+  string node_id = 1;
+  TunnelState tunnel_state = 2;
+  NodeRole role = 3;
+  uint32 connected_peers = 4;
+  int64 started_at_unix_ms = 5;
+  int64 uptime_seconds = 6;
+  string version = 7;
+  string platform = 8;
+}
+
+// === Tunnel ===
+
+message StartTunnelRequest {
+  NodeRole role = 1;
+}
+
+message StartTunnelResponse {
+  TunnelState state = 1;
+  string proxy_address = 2;  // SOCKS5 proxy listen address (master only)
+  uint32 quic_port = 3;      // QUIC listener port
+}
+
+message StopTunnelRequest {}
+
+message StopTunnelResponse {
+  TunnelState state = 1;
+}
+
+// === Peers ===
+
+message Peer {
+  string id = 1;
+  bytes public_key = 2;
+  string endpoint = 3;
+  int64 last_seen_unix_ms = 4;
+  NodeRole role = 5;
+  string platform = 6;
+  PeerConnectionStats stats = 7;
+}
+
+message PeerConnectionStats {
+  int64 bytes_sent = 1;
+  int64 bytes_received = 2;
+  int64 connected_at_unix_ms = 3;
+  double latency_ms = 4;
+}
+
+message ListPeersRequest {}
+
+message ListPeersResponse {
+  repeated Peer peers = 1;
+}
+
+message ConnectPeerRequest {
+  string peer_id = 1;
+  string address = 2;
+  bytes public_key = 3;
+}
+
+message ConnectPeerResponse {
+  bool connected = 1;
+  string error_message = 2;
+}
+
+message DisconnectPeerRequest {
+  string peer_id = 1;
+}
+
+message DisconnectPeerResponse {
+  bool disconnected = 1;
+}
+
+// === Role ===
+
+message SetRoleRequest {
+  NodeRole role = 1;
+}
+
+message SetRoleResponse {
+  NodeRole role = 1;
+  TunnelState tunnel_state = 2;
+}
+
+message GetRoleRequest {}
+
+message GetRoleResponse {
+  NodeRole role = 1;
+}
+
+// === QR Credential Exchange ===
+
+message GenerateQRRequest {}
+
+message GenerateQRResponse {
+  string qr_payload = 1;       // Base64-encoded JSON credential blob
+  string proxy_host = 2;       // Proxy address for client configuration
+  uint32 proxy_port = 3;       // Proxy port
+  uint32 quic_port = 4;        // QUIC port for encrypted transport
+  bytes encryption_key = 5;    // Session encryption key
+  int64 expires_at_unix_ms = 6; // Credential expiration
+}
+
+message ImportQRRequest {
+  string qr_payload = 1;       // Scanned QR payload
+}
+
+message ImportQRResponse {
+  bool success = 1;
+  string peer_id = 2;
+  string proxy_address = 3;
+  string error_message = 4;
+}
+
+// === Traffic Stats ===
+
+message GetTrafficStatsRequest {}
+
+message GetTrafficStatsResponse {
+  TrafficSnapshot current = 1;
+  repeated TrafficSnapshot history = 2; // Last 60 data points
+}
+
+message StreamTrafficStatsRequest {
+  uint32 interval_ms = 1; // Update interval (default 500ms)
+}
+
+message TrafficStatsUpdate {
+  TrafficSnapshot snapshot = 1;
+  int64 timestamp_unix_ms = 2;
+}
+
+message TrafficSnapshot {
+  int64 bytes_in = 1;
+  int64 bytes_out = 2;
+  double throughput_in_bps = 3;   // Bits per second inbound
+  double throughput_out_bps = 4;  // Bits per second outbound
+  int64 active_connections = 5;
+  int64 total_connections = 6;
+  int64 packets_processed = 7;
+}
+
+// === Privacy Stats ===
+
+message GetPrivacyStatsRequest {}
+
+message GetPrivacyStatsResponse {
+  TTLNormalizationStats ttl = 1;
+  FragmentationStats fragmentation = 2;
+  UserAgentStats user_agent = 3;
+}
+
+message TTLNormalizationStats {
+  int64 packets_processed = 1;
+  int64 packets_modified = 2;
+  int64 ipv4_packets = 3;
+  int64 ipv6_packets = 4;
+  map<uint32, int64> original_ttl_histogram = 5;
+}
+
+message FragmentationStats {
+  int64 packets_fragmented = 1;
+  int64 fragments_created = 2;
+  int64 tls_records_split = 3;
+  int64 bytes_processed = 4;
+}
+
+message UserAgentStats {
+  int64 requests_processed = 1;
+  int64 requests_modified = 2;
+  int64 headers_stripped = 3;
+}

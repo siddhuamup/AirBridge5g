@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "ecc.install.v1",
+  "installedAt": "2026-08-05T18:27:21.605Z",
+  "target": {
+    "id": "gemini-project",
+    "target": "gemini",
+    "kind": "project",
+    "root": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini",
+    "installStatePath": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini\\ecc-install-state.json"
+  },
+  "request": {
+    "profile": "full",
+    "modules": [],
+    "includeComponents": [],
+    "excludeComponents": [],
+    "legacyLanguages": [],
+    "legacyMode": false
+  },
+  "resolution": {
+    "selectedModules": [
+      "platform-configs",
+      "skill-unified-memory",
+      "ito-compute"
+    ],
+    "skippedModules": [
+      "rules-core",
+      "agents-core",
+      "commands-core",
+      "hooks-runtime",
+      "framework-language",
+      "database",
+      "workflow-quality",
+      "optimization-workflows",
+      "security",
+      "research-apis",
+      "business-content",
+      "operator-workflows",
+      "prediction-market-skills",
+      "social-distribution",
+      "media-generation",
+      "orchestration",
+      "swift-apple",
+      "agentic-patterns",
+      "devops-infra",
+      "machine-learning",
+      "supply-chain-domain",
+      "document-processing"
+    ]
+  },
+  "source": {
+    "repoVersion": "2.1.0",
+    "repoCommit": "f1fec0e53934737d3b3b8388b0fd1651e8b62f4f",
+    "manifestVersion": 1
+  },
+  "operations": [
+    {
+      "kind": "copy-file",
+      "moduleId": "platform-configs",
+      "sourcePath": "C:\\Users\\Siddhu\\.gemini\\antigravity\\brain\\7fa575f9-9d30-45b4-83b9-13a95b598472\\scratch\\ECC\\.gemini\\GEMINI.md",
+      "sourceRelativePath": ".gemini\\GEMINI.md",
+      "destinationPath": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini\\GEMINI.md",
+      "strategy": "sync-root-children",
+      "ownership": "managed",
+      "scaffoldOnly": false
+    },
+    {
+      "kind": "copy-file",
+      "moduleId": "platform-configs",
+      "sourcePath": "C:\\Users\\Siddhu\\.gemini\\antigravity\\brain\\7fa575f9-9d30-45b4-83b9-13a95b598472\\scratch\\ECC\\mcp-configs\\mcp-servers.json",
+      "sourceRelativePath": "mcp-configs\\mcp-servers.json",
+      "destinationPath": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini\\mcp-configs\\mcp-servers.json",
+      "strategy": "preserve-relative-path",
+      "ownership": "managed",
+      "scaffoldOnly": false
+    },
+    {
+      "kind": "copy-file",
+      "moduleId": "platform-configs",
+      "sourcePath": "C:\\Users\\Siddhu\\.gemini\\antigravity\\brain\\7fa575f9-9d30-45b4-83b9-13a95b598472\\scratch\\ECC\\scripts\\auto-update.js",
+      "sourceRelativePath": "scripts/auto-update.js",
+      "destinationPath": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini\\scripts\\auto-update.js",
+      "strategy": "preserve-relative-path",
+      "ownership": "managed",
+      "scaffoldOnly": false
+    },
+    {
+      "kind": "copy-file",
+      "moduleId": "platform-configs",
+      "sourcePath": "C:\\Users\\Siddhu\\.gemini\\antigravity\\brain\\7fa575f9-9d30-45b4-83b9-13a95b598472\\scratch\\ECC\\scripts\\setup-package-manager.js",
+      "sourceRelativePath": "scripts/setup-package-manager.js",
+      "destinationPath": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini\\scripts\\setup-package-manager.js",
+      "strategy": "preserve-relative-path",
+      "ownership": "managed",
+      "scaffoldOnly": false
+    },
+    {
+      "kind": "copy-file",
+      "moduleId": "skill-unified-memory",
+      "sourcePath": "C:\\Users\\Siddhu\\.gemini\\antigravity\\brain\\7fa575f9-9d30-45b4-83b9-13a95b598472\\scratch\\ECC\\skills\\unified-memory\\SKILL.md",
+      "sourceRelativePath": "skills\\unified-memory\\SKILL.md",
+      "destinationPath": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini\\skills\\unified-memory\\SKILL.md",
+      "strategy": "preserve-relative-path",
+      "ownership": "managed",
+      "scaffoldOnly": false
+    },
+    {
+      "kind": "copy-file",
+      "moduleId": "ito-compute",
+      "sourcePath": "C:\\Users\\Siddhu\\.gemini\\antigravity\\brain\\7fa575f9-9d30-45b4-83b9-13a95b598472\\scratch\\ECC\\skills\\ito-compute\\SKILL.md",
+      "sourceRelativePath": "skills\\ito-compute\\SKILL.md",
+      "destinationPath": "C:\\Users\\Siddhu\\Desktop\\New folder\\.gemini\\skills\\ito-compute\\SKILL.md",
+      "strategy": "preserve-relative-path",
+      "ownership": "managed",
+      "scaffoldOnly": false
+    }
+  ]
+}
