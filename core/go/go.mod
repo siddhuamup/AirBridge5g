@@ -10,7 +10,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.26.0
 	golang.org/x/crypto v0.24.0
 	google.golang.org/grpc v1.64.0
-	google.golang.org/protobuf v1.34.1
 	modernc.org/sqlite v1.29.10
 )
 
@@ -36,6 +35,7 @@ require (
 	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
+	google.golang.org/protobuf v1.34.1 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.49.3 // indirect
 	modernc.org/mathutil v1.6.0 // indirect

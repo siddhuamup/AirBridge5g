@@ -4,6 +4,8 @@ import 'daemon_client.dart';
 import '../providers/role_provider.dart';
 import '../utils/crypto_utils.dart';
 import '../generated/control.pbgrpc.dart';
+import '../generated/control.pbenum.dart';
+
 
 /// Real gRPC daemon client connecting to the local AirBridge 5G Go daemon at 127.0.0.1:50051.
 class GrpcDaemonClient implements AirBridgeDaemonClient {
