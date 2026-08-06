@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../app.dart';
 import '../../providers/role_provider.dart';
+import '../../providers/daemon_provider.dart';
 
 /// Client Dashboard — Minimalist Sky Blue theme.
 /// Features QR scanner, one-click connect, and connection status.
@@ -17,8 +19,10 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
     with TickerProviderStateMixin {
   late final AnimationController _entryController;
   late final AnimationController _scanLineController;
+  final MobileScannerController _scannerController = MobileScannerController();
   bool _isConnected = false;
   bool _isScanning = false;
+  bool _isConnecting = false;
 
   @override
   void initState() {
@@ -37,24 +41,52 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   void dispose() {
     _entryController.dispose();
     _scanLineController.dispose();
+    _scannerController.dispose();
     super.dispose();
   }
 
   void _startScanning() {
     setState(() => _isScanning = true);
     _scanLineController.repeat(reverse: true);
-
-    // Simulate scan completion
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _isScanning = false;
-          _isConnected = true;
-        });
-        _scanLineController.stop();
-      }
-    });
   }
+
+  void _handleBarcodeDetected(BarcodeCapture capture) async {
+    final List<Barcode> barcodes = capture.barcodes;
+    for (final barcode in barcodes) {
+      final rawValue = barcode.rawValue;
+      if (rawValue != null && rawValue.isNotEmpty && !_isConnecting) {
+        setState(() {
+          _isConnecting = true;
+        });
+        try {
+          final daemonClient = ref.read(daemonProvider);
+          final success = await daemonClient.connectWithQR(rawValue);
+          if (success && mounted) {
+            setState(() {
+              _isScanning = false;
+              _isConnected = true;
+              _isConnecting = false;
+            });
+            _scanLineController.stop();
+          } else if (mounted) {
+            setState(() => _isConnecting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Failed to connect using QR credentials')),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() => _isConnecting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Connection error: $e')),
+            );
+          }
+        }
+        break;
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +246,15 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                 ),
                 child: Stack(
                   children: [
+                    // Camera preview when scanning
+                    if (_isScanning)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: MobileScanner(
+                          controller: _scannerController,
+                          onDetect: _handleBarcodeDetected,
+                        ),
+                      ),
                     // Corner markers
                     ..._buildCornerMarkers(),
                     // Scan line
@@ -242,8 +283,18 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                           ),
                         ),
                       ),
+                    // Connecting loading indicator
+                    if (_isConnecting)
+                      Container(
+                        color: Colors.black54,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: AirBridgeColors.clientPrimary,
+                          ),
+                        ),
+                      ),
                     // Center icon
-                    if (!_isScanning)
+                    if (!_isScanning && !_isConnecting)
                       Center(
                         child: Icon(
                           Icons.camera_alt_rounded,
@@ -251,6 +302,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                           color: AirBridgeColors.clientPrimary.withValues(alpha: 0.3),
                         ),
                       ),
+
                     // Scanning text
                     if (_isScanning)
                       const Center(

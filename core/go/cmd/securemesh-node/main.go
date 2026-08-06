@@ -145,6 +145,13 @@ func main() {
 		}
 	}()
 
+	// === gRPC Server ===
+	grpcServer := services.NewGRPCServer(daemon, daemonCfg.GRPCAddress)
+	if err := grpcServer.Start(ctx); err != nil {
+		log.Fatalf("[airbridge] gRPC server start: %v", err)
+	}
+	defer grpcServer.Stop()
+
 	// === Status Report ===
 	status, err := daemon.Status(ctx)
 	if err != nil {
@@ -155,6 +162,7 @@ func main() {
 		fmt.Printf("    State:       %s\n", status.TunnelState)
 		fmt.Printf("    Mesh Node:   %s\n", meshService.NodeID())
 		fmt.Printf("    Proxy:       %s\n", proxyCfg.BindAddress)
+		fmt.Printf("    gRPC Server: %s\n", daemonCfg.GRPCAddress)
 		fmt.Printf("    Platform:    %s\n", plat)
 		fmt.Printf("    State DB:    %s (%s)\n\n", cfg.Storage.Path, cfg.Storage.Driver)
 	}
@@ -163,3 +171,4 @@ func main() {
 	<-ctx.Done()
 	fmt.Println("\n  Shutting down gracefully...")
 }
+

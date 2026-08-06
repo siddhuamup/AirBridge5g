@@ -28,6 +28,10 @@ dependencies:
 
   # Networking
   dio: ^5.5.0+1
+  grpc: ^3.2.4
+  protobuf: ^3.1.0
+  mobile_scanner: ^5.0.0
+
 
   # Storage
   shared_preferences: ^2.2.3
