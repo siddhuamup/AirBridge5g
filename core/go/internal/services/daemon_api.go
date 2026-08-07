@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"time"
-
-	"github.com/example/securemesh/core/internal/storage"
 )
 
 // SetRoleConvenience sets the node role without explicit context requirement.
@@ -48,9 +46,3 @@ func (d *Daemon) GetTrafficSnapshot() TrafficSnapshot {
 	return d.currentTrafficSnapshot()
 }
 
-// ListPeersConvenience returns connected peers from state store using default context.
-func (d *Daemon) ListPeersConvenience() ([]storage.Peer, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	return d.ListPeers(ctx)
-}

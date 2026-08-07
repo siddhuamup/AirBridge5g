@@ -1,16 +1,25 @@
 import 'dart:async';
 import 'package:grpc/grpc.dart';
 import 'daemon_client.dart';
-import '../providers/role_provider.dart';
+import '../providers/role_provider.dart' as app;
 import '../utils/crypto_utils.dart';
-import '../generated/control.pbgrpc.dart';
-import '../generated/control.pbenum.dart';
+import '../generated/control.pb.dart' as pb;
+import '../generated/control.pbgrpc.dart' as pbgrpc;
+import '../generated/control.pbenum.dart' as pbenum;
 
-
-/// Real gRPC daemon client connecting to the local AirBridge 5G Go daemon at 127.0.0.1:50051.
+/// Real gRPC daemon client connecting to the local AirBridge 5G Go daemon.
+///
+/// Connects to `127.0.0.1:50051` by default with insecure credentials.
+/// Includes retry logic with exponential backoff for transient failures.
 class GrpcDaemonClient implements AirBridgeDaemonClient {
   late final ClientChannel _channel;
-  late final ControlPlaneClient _client;
+  late final pbgrpc.ControlPlaneClient _client;
+
+  /// Maximum number of retries for transient gRPC failures.
+  static const int _maxRetries = 3;
+
+  /// Base delay for exponential backoff (500ms → 1s → 2s).
+  static const Duration _baseDelay = Duration(milliseconds: 500);
 
   GrpcDaemonClient({
     String host = '127.0.0.1',
@@ -24,50 +33,59 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
         idleTimeout: Duration(minutes: 5),
       ),
     );
-    _client = ControlPlaneClient(_channel);
+    _client = pbgrpc.ControlPlaneClient(_channel);
   }
 
   @override
-  Future<bool> startTunnel(NodeRole role) async {
-    final pbRole = _mapRoleToPb(role);
-    final response = await _client.startTunnel(
-      StartTunnelRequest(role: pbRole),
-    );
-    return response.state == TunnelState.TUNNEL_STATE_RUNNING;
+  Future<bool> startTunnel(app.NodeRole role) async {
+    return _retryCall('startTunnel', () async {
+      final pbRole = _mapRoleToPb(role);
+      final response = await _client.startTunnel(
+        pb.StartTunnelRequest(role: pbRole),
+      );
+      return response.state == pbenum.TunnelState.TUNNEL_STATE_RUNNING;
+    });
   }
 
   @override
   Future<bool> stopTunnel() async {
-    final response = await _client.stopTunnel(StopTunnelRequest());
-    return response.state == TunnelState.TUNNEL_STATE_STOPPED;
+    return _retryCall('stopTunnel', () async {
+      final response = await _client.stopTunnel(pb.StopTunnelRequest());
+      return response.state == pbenum.TunnelState.TUNNEL_STATE_STOPPED;
+    });
   }
 
   @override
   Future<QRCredentials> generateQRCredentials() async {
-    final response = await _client.generateQRCredentials(GenerateQRRequest());
-    return QRCredentials(
-      nodeId: response.proxyHost.isEmpty ? 'airbridge-master' : 'master-node',
-      proxyHost: response.proxyHost,
-      proxyPort: response.proxyPort,
-      quicPort: response.quicPort,
-      encryptionKey: String.fromCharCodes(response.encryptionKey),
-      expiresAt: response.expiresAtUnixMs.toInt(),
-      authToken: response.qrPayload,
-    );
+    return _retryCall('generateQRCredentials', () async {
+      final response =
+          await _client.generateQRCredentials(pb.GenerateQRRequest());
+      return QRCredentials(
+        nodeId: response.proxyHost.isEmpty ? 'airbridge-master' : 'master-node',
+        proxyHost: response.proxyHost,
+        proxyPort: response.proxyPort,
+        quicPort: response.quicPort,
+        encryptionKey: String.fromCharCodes(response.encryptionKey),
+        expiresAt: response.expiresAtUnixMs.toInt(),
+        authToken: response.qrPayload,
+      );
+    });
   }
 
   @override
   Future<bool> connectWithQR(String qrPayload) async {
-    final response = await _client.importQRCredentials(
-      ImportQRRequest(qrPayload: qrPayload),
-    );
-    return response.success;
+    return _retryCall('connectWithQR', () async {
+      final response = await _client.importQRCredentials(
+        pb.ImportQRRequest(qrPayload: qrPayload),
+      );
+      return response.success;
+    });
   }
 
   @override
   Stream<Map<String, dynamic>> streamTrafficStats() {
     final responseStream = _client.streamTrafficStats(
-      StreamTrafficStatsRequest(intervalMs: 500),
+      pb.StreamTrafficStatsRequest(intervalMs: 500),
     );
 
     return responseStream.map((update) {
@@ -82,21 +100,82 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
         'packets_processed': snap.packetsProcessed.toInt(),
         'timestamp': update.timestampUnixMs.toInt(),
       };
+    }).handleError((error) {
+      // Convert gRPC errors to user-friendly messages
+      if (error is GrpcError) {
+        throw Exception(_friendlyGrpcError(error));
+      }
+      throw error;
     });
   }
 
+  /// Shuts down the gRPC channel.
   Future<void> dispose() async {
     await _channel.shutdown();
   }
 
-  NodeRole _mapRoleToPb(NodeRole role) {
-    switch (role) {
-      case NodeRole.master:
-        return NodeRole.NODE_ROLE_MASTER;
-      case NodeRole.client:
-        return NodeRole.NODE_ROLE_CLIENT;
+  // === Private Helpers ===
+
+  /// Retries a gRPC call up to [_maxRetries] times with exponential backoff.
+  Future<T> _retryCall<T>(String methodName, Future<T> Function() call) async {
+    for (int attempt = 0; attempt <= _maxRetries; attempt++) {
+      try {
+        return await call();
+      } on GrpcError catch (e) {
+        // Don't retry non-transient errors
+        if (!_isRetryable(e.code)) {
+          throw Exception(_friendlyGrpcError(e));
+        }
+        // Last attempt — propagate the error
+        if (attempt == _maxRetries) {
+          throw Exception(_friendlyGrpcError(e));
+        }
+        // Exponential backoff: 500ms, 1s, 2s
+        final delay = _baseDelay * (1 << attempt);
+        await Future.delayed(delay);
+      }
+    }
+    // Unreachable, but satisfies the type system
+    throw Exception('Unexpected retry exhaustion in $methodName');
+  }
+
+  /// Returns true for gRPC status codes that indicate transient failures.
+  bool _isRetryable(int? code) {
+    return code == StatusCode.unavailable ||
+        code == StatusCode.deadlineExceeded ||
+        code == StatusCode.aborted ||
+        code == StatusCode.resourceExhausted;
+  }
+
+  /// Maps gRPC error codes to user-friendly messages.
+  String _friendlyGrpcError(GrpcError error) {
+    switch (error.code) {
+      case StatusCode.unavailable:
+        return 'Daemon offline. Start the backend service and try again.';
+      case StatusCode.deadlineExceeded:
+        return 'Request timed out. The daemon may be under heavy load.';
+      case StatusCode.unimplemented:
+        return 'This feature is not yet available on the daemon.';
+      case StatusCode.permissionDenied:
+        return 'Permission denied. Check your authentication credentials.';
+      case StatusCode.invalidArgument:
+        return 'Invalid request parameters: ${error.message}';
+      case StatusCode.internal:
+        return 'Daemon internal error: ${error.message}';
       default:
-        return NodeRole.NODE_ROLE_UNSPECIFIED;
+        return 'Connection error (${error.codeName}): ${error.message}';
+    }
+  }
+
+  /// Maps the app's NodeRole enum to the protobuf NodeRole enum.
+  pbenum.NodeRole _mapRoleToPb(app.NodeRole role) {
+    switch (role) {
+      case app.NodeRole.master:
+        return pbenum.NodeRole.NODE_ROLE_MASTER;
+      case app.NodeRole.client:
+        return pbenum.NodeRole.NODE_ROLE_CLIENT;
+      default:
+        return pbenum.NodeRole.NODE_ROLE_UNSPECIFIED;
     }
   }
 }
