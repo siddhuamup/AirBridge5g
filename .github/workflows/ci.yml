@@ -16,7 +16,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
+
+      - name: Run Go Vet & Linter
+        run: |
+          cd core/go
+          go vet ./...
 
       - name: Run Go Unit Tests
         run: |
@@ -44,7 +49,13 @@ jobs:
           cd apps/airbridge_5g
           flutter pub get
 
+      - name: Analyze Flutter Code
+        run: |
+          cd apps/airbridge_5g
+          flutter analyze
+
       - name: Run Flutter Tests
         run: |
           cd apps/airbridge_5g
           flutter test --coverage
+

@@ -92,9 +92,30 @@ class AirBridgeApp extends ConsumerWidget {
     );
   }
 
-  /// Material 3 dark theme — always dark navy for master.
+  /// Material 3 dark theme — distinct dark palette for client and neutral modes.
   ThemeData _materialDarkTheme(NodeRole role) {
-    return _materialLightTheme(role); // Role already drives brightness
+    if (role == NodeRole.master) {
+      return _materialLightTheme(role);
+    }
+    final scheme = ColorScheme.fromSeed(
+      seedColor: role == NodeRole.client
+          ? AirBridgeColors.clientPrimary
+          : AirBridgeColors.neutralPrimary,
+      brightness: Brightness.dark,
+    ).copyWith(
+      surface: const Color(0xFF0F172A),
+      onSurface: Colors.white,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+      cardTheme: CardTheme(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+    );
   }
 
   /// Cupertino theme for iOS.

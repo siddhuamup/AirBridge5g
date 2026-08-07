@@ -5,7 +5,9 @@ Thumbs.db
 # Go
 bin/
 *.test
+*.exe
 coverage.out
+
 
 # Rust
 target/

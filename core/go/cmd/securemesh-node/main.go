@@ -16,6 +16,7 @@ import (
 	"github.com/example/securemesh/core/internal/privacy"
 	"github.com/example/securemesh/core/internal/protocol"
 	"github.com/example/securemesh/core/internal/proxy"
+	"github.com/example/securemesh/core/internal/security"
 	"github.com/example/securemesh/core/internal/services"
 	"github.com/example/securemesh/core/internal/storage"
 	"go.opentelemetry.io/otel"
@@ -103,11 +104,24 @@ func main() {
 	log.Printf("[airbridge] privacy engine initialized (TTL target=%d, fragment strategy=random)",
 		privacy.DefaultTargetTTL)
 
+	// === Daemon (Control Plane) ===
+	daemonCfg := services.DefaultDaemonConfig()
+	daemonCfg.NodeID = cfg.NodeID
+	daemonCfg.Version = version
+
+	// === Security & Kill Switch ===
+	killSwitch := security.NewKillSwitch(daemonCfg.ProxyAddress, daemonCfg.GRPCAddress)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-security] panic recovered during shutdown: %v", r)
+		}
+		_ = killSwitch.Disable()
+	}()
+
 	// === SOCKS5 Proxy Server ===
 	proxyCfg := proxy.DefaultServerConfig()
-	proxyCfg.Auth = proxy.NewTokenAuthenticator(map[string]string{
-		"airbridge": "default-dev-token", // Replaced by QR credential exchange in production
-	})
+	// Dynamic token authenticator — populated via QR credential exchange at runtime
+	proxyCfg.Auth = proxy.NewTokenAuthenticator(make(map[string]string))
 	proxyServer := proxy.NewServer(proxyCfg)
 
 	// === Mesh Network ===
@@ -118,11 +132,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("[airbridge] init mesh: %v", err)
 	}
-
-	// === Daemon (Control Plane) ===
-	daemonCfg := services.DefaultDaemonConfig()
-	daemonCfg.NodeID = cfg.NodeID
-	daemonCfg.Version = version
 
 	daemon := services.NewDaemon(
 		daemonCfg,

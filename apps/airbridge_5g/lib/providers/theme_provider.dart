@@ -65,9 +65,17 @@ class TrafficData {
 }
 
 class TrafficDataNotifier extends StateNotifier<TrafficData> {
+  DateTime? _lastTickTime;
+
   TrafficDataNotifier() : super(const TrafficData());
 
   void addDataPoint(double upload, double download) {
+    final now = DateTime.now();
+    final double elapsedSeconds = _lastTickTime != null
+        ? now.difference(_lastTickTime!).inMilliseconds / 1000.0
+        : 0.5;
+    _lastTickTime = now;
+
     final newUpload = [...state.uploadHistory, upload];
     final newDownload = [...state.downloadHistory, download];
 
@@ -80,12 +88,13 @@ class TrafficDataNotifier extends StateNotifier<TrafficData> {
       downloadHistory: newDownload,
       currentUpload: upload,
       currentDownload: download,
-      totalBytesIn: state.totalBytesIn + (download / 8 * 0.5).round(), // 500ms interval
-      totalBytesOut: state.totalBytesOut + (upload / 8 * 0.5).round(),
+      totalBytesIn: state.totalBytesIn + (download / 8 * elapsedSeconds).round(),
+      totalBytesOut: state.totalBytesOut + (upload / 8 * elapsedSeconds).round(),
     );
   }
 
   void reset() {
+    _lastTickTime = null;
     state = const TrafficData();
   }
 }

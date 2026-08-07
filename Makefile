@@ -1,6 +1,6 @@
 GO_CORE := ./core/go
 RUST_HOTPATH := ./core/rust/securemesh_hotpath
-FLUTTER_APP := ./apps/flutter_securemesh
+FLUTTER_APP := ./apps/airbridge_5g
 
 .PHONY: go-test rust-test flutter-analyze proto-note
 
