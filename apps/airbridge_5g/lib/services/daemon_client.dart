@@ -10,6 +10,7 @@ abstract class AirBridgeDaemonClient {
   Future<QRCredentials> generateQRCredentials();
   Future<bool> connectWithQR(String qrPayload);
   Stream<Map<String, dynamic>> streamTrafficStats();
+  Future<int> getConnectedPeers();
 }
 
 /// Simulated Daemon Client for local UI development and testing.
@@ -68,6 +69,11 @@ class LocalDaemonClient implements AirBridgeDaemonClient {
         'packets_processed': count * 120,
       };
     });
+  }
+
+  @override
+  Future<int> getConnectedPeers() async {
+    return _isRunning ? 3 : 0;
   }
 }
 

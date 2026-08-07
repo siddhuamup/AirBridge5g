@@ -26,6 +26,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
   StreamSubscription? _trafficSub;
   QRCredentials? _qrCredentials;
   DateTime _sessionStart = DateTime.now();
+  int _peerCount = 0;
 
   @override
   void initState() {
@@ -46,14 +47,24 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
       }
     });
     
-    // Generate real QR credentials
-    _generateCredentials();
+    // Fetch daemon status and credentials
+    _fetchDaemonStatus();
   }
 
-  Future<void> _generateCredentials() async {
+  Future<void> _fetchDaemonStatus() async {
     final client = ref.read(daemonProvider);
-    final creds = await client.generateQRCredentials();
-    if (mounted) setState(() => _qrCredentials = creds);
+    try {
+      final creds = await client.generateQRCredentials();
+      final peers = await client.getConnectedPeers();
+      if (mounted) {
+        setState(() {
+          _qrCredentials = creds;
+          _peerCount = peers;
+        });
+      }
+    } catch (_) {
+      // Fallback if daemon calls fail
+    }
   }
 
   @override
@@ -192,7 +203,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         const SizedBox(width: 12),
         Expanded(child: _StatCard(
           label: 'PEERS',
-          value: '3',
+          value: '$_peerCount',
           icon: Icons.devices_rounded,
           color: const Color(0xFFFFAB40),
         )),

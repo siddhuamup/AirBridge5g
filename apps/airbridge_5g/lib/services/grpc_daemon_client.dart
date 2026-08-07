@@ -109,6 +109,14 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
     });
   }
 
+  @override
+  Future<int> getConnectedPeers() async {
+    return _retryCall('getConnectedPeers', () async {
+      final response = await _client.getStatus(pb.GetStatusRequest());
+      return response.connectedPeers;
+    });
+  }
+
   /// Shuts down the gRPC channel.
   Future<void> dispose() async {
     await _channel.shutdown();

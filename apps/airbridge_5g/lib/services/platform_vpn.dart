@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'windows_proxy.dart';
 import 'android_vpn.dart';
+import 'ios_vpn.dart';
 
 /// Unified cross-platform network resilience manager.
 /// Automatically selects WinINet proxy on Windows, VpnService on Android, and NetworkExtension on iOS.
@@ -13,10 +14,12 @@ class PlatformNetworkManager {
     final proxyAddr = '$proxyHost:$proxyPort';
     if (Platform.isWindows) {
       return await WindowsProxyService.setSystemProxy(proxyAddr);
-    } else if (Platform.isAndroid || Platform.isIOS) {
+    } else if (Platform.isAndroid) {
       return await MobileVpnService.startVpn(proxyHost, proxyPort);
+    } else if (Platform.isIOS) {
+      return await IosVpnService.startVpn(proxyHost, proxyPort);
     }
-    // Linux / macOS desktop fallbacks: return true assuming proxy is available
+    // Linux / macOS desktop fallbacks
     return true;
   }
 
@@ -24,8 +27,10 @@ class PlatformNetworkManager {
   static Future<bool> disableNetworkTunnel() async {
     if (Platform.isWindows) {
       return await WindowsProxyService.disableSystemProxy();
-    } else if (Platform.isAndroid || Platform.isIOS) {
+    } else if (Platform.isAndroid) {
       return await MobileVpnService.stopVpn();
+    } else if (Platform.isIOS) {
+      return await IosVpnService.stopVpn();
     }
     return true;
   }
