@@ -61,13 +61,13 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
       final response =
           await _client.generateQRCredentials(pb.GenerateQRRequest());
       return QRCredentials(
-        nodeId: response.proxyHost.isEmpty ? 'airbridge-master' : 'master-node',
+        nodeId: response.nodeId,
         proxyHost: response.proxyHost,
         proxyPort: response.proxyPort,
         quicPort: response.quicPort,
-        encryptionKey: String.fromCharCodes(response.encryptionKey),
+        encryptionKey: response.encryptionKey,
         expiresAt: response.expiresAtUnixMs.toInt(),
-        authToken: response.qrPayload,
+        authToken: response.authToken,
       );
     });
   }

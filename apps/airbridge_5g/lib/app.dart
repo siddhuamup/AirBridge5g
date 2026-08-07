@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:fluent_ui/fluent_ui.dart' as fluent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'providers/role_provider.dart';
@@ -19,6 +20,22 @@ class AirBridgeApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
     final role = ref.watch(roleProvider);
+
+    if (!kIsWeb && Platform.isWindows) {
+      return fluent.FluentApp.router(
+        title: 'AirBridge 5G',
+        debugShowCheckedModeBanner: false,
+        routerConfig: router,
+        theme: fluent.FluentThemeData(
+          accentColor: fluent.Colors.blue,
+          visualDensity: fluent.VisualDensity.standard,
+        ),
+        darkTheme: fluent.FluentThemeData(
+          brightness: Brightness.dark,
+          accentColor: fluent.Colors.blue,
+        ),
+      );
+    }
 
     // Platform-adaptive app shell
     if (_isApplePlatform) {

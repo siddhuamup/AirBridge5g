@@ -71,10 +71,6 @@ class LocalDaemonClient implements AirBridgeDaemonClient {
   }
 }
 
-/// Provider for the daemon client service.
-final daemonClientProvider = Provider<AirBridgeDaemonClient>((ref) {
-  return LocalDaemonClient();
-});
 
 export 'grpc_daemon_client.dart';
 

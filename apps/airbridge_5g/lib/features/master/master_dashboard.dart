@@ -8,6 +8,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../app.dart';
 import '../../providers/role_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/daemon_provider.dart';
+import '../../utils/crypto_utils.dart';
 
 /// Master Dashboard — Dark Navy + Radiant Green theme.
 /// Shows QR code generator, real-time traffic graph, connected devices, and session timer.
@@ -21,8 +23,8 @@ class MasterDashboard extends ConsumerStatefulWidget {
 class _MasterDashboardState extends ConsumerState<MasterDashboard>
     with TickerProviderStateMixin {
   late final AnimationController _entryController;
-  Timer? _trafficTimer;
-  final _random = Random();
+  StreamSubscription? _trafficSub;
+  QRCredentials? _qrCredentials;
   DateTime _sessionStart = DateTime.now();
 
   @override
@@ -33,21 +35,31 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
       duration: const Duration(milliseconds: 1000),
     )..forward();
 
-    // Simulate real-time traffic data
-    _trafficTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+    // Subscribe to real daemon traffic stream
+    final client = ref.read(daemonProvider);
+    _trafficSub = client.streamTrafficStats().listen((data) {
       if (mounted) {
         ref.read(trafficDataProvider.notifier).addDataPoint(
-          _random.nextDouble() * 50e6 + 10e6, // 10-60 Mbps upload
-          _random.nextDouble() * 80e6 + 20e6, // 20-100 Mbps download
+          (data['throughput_out_bps'] as num?)?.toDouble() ?? 0.0,  // download
+          (data['throughput_in_bps'] as num?)?.toDouble() ?? 0.0,   // upload
         );
       }
     });
+    
+    // Generate real QR credentials
+    _generateCredentials();
+  }
+
+  Future<void> _generateCredentials() async {
+    final client = ref.read(daemonProvider);
+    final creds = await client.generateQRCredentials();
+    if (mounted) setState(() => _qrCredentials = creds);
   }
 
   @override
   void dispose() {
+    _trafficSub?.cancel();
     _entryController.dispose();
-    _trafficTimer?.cancel();
     super.dispose();
   }
 
@@ -239,7 +251,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
               ],
             ),
             child: QrImageView(
-              data: '{"node_id":"airbridge-master","proxy":"192.168.1.100:1080","quic":4433,"key":"demo_key"}',
+              data: _qrCredentials?.encode() ?? '{}',
               version: QrVersions.auto,
               size: 180,
               eyeStyle: const QrEyeStyle(

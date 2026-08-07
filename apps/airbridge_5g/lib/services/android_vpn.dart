@@ -11,8 +11,8 @@ class MobileVpnService {
     if (!Platform.isAndroid && !Platform.isIOS) return false;
     try {
       final bool success = await _channel.invokeMethod('startVpn', {
-        'proxyHost': proxyHost,
-        'proxyPort': proxyPort,
+        'proxy_host': proxyHost,
+        'proxy_port': proxyPort,
       });
       return success;
     } on PlatformException catch (e) {
