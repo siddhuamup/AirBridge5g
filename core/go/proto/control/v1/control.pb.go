@@ -3,7 +3,6 @@
 
 package controlv1
 
-
 // === Enums ===
 
 type NodeRole int32
@@ -58,14 +57,14 @@ func (x *GetStatusRequest) Reset()         { *x = GetStatusRequest{} }
 func (x *GetStatusRequest) String() string { return "GetStatusRequest" }
 
 type GetStatusResponse struct {
-	NodeId           string      `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
-	TunnelState      TunnelState `protobuf:"varint,2,opt,name=tunnel_state,json=tunnelState,proto3,enum=airbridge.control.v1.TunnelState" json:"tunnel_state,omitempty"`
-	Role             NodeRole    `protobuf:"varint,3,opt,name=role,proto3,enum=airbridge.control.v1.NodeRole" json:"role,omitempty"`
-	ConnectedPeers   uint32      `protobuf:"varint,4,opt,name=connected_peers,json=connectedPeers,proto3" json:"connected_peers,omitempty"`
-	StartedAtUnixMs  int64       `protobuf:"varint,5,opt,name=started_at_unix_ms,json=startedAtUnixMs,proto3" json:"started_at_unix_ms,omitempty"`
-	UptimeSeconds    int64       `protobuf:"varint,6,opt,name=uptime_seconds,json=uptimeSeconds,proto3" json:"uptime_seconds,omitempty"`
-	Version          string      `protobuf:"bytes,7,opt,name=version,proto3" json:"version,omitempty"`
-	Platform         string      `protobuf:"bytes,8,opt,name=platform,proto3" json:"platform,omitempty"`
+	NodeId          string      `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	TunnelState     TunnelState `protobuf:"varint,2,opt,name=tunnel_state,json=tunnelState,proto3,enum=airbridge.control.v1.TunnelState" json:"tunnel_state,omitempty"`
+	Role            NodeRole    `protobuf:"varint,3,opt,name=role,proto3,enum=airbridge.control.v1.NodeRole" json:"role,omitempty"`
+	ConnectedPeers  uint32      `protobuf:"varint,4,opt,name=connected_peers,json=connectedPeers,proto3" json:"connected_peers,omitempty"`
+	StartedAtUnixMs int64       `protobuf:"varint,5,opt,name=started_at_unix_ms,json=startedAtUnixMs,proto3" json:"started_at_unix_ms,omitempty"`
+	UptimeSeconds   int64       `protobuf:"varint,6,opt,name=uptime_seconds,json=uptimeSeconds,proto3" json:"uptime_seconds,omitempty"`
+	Version         string      `protobuf:"bytes,7,opt,name=version,proto3" json:"version,omitempty"`
+	Platform        string      `protobuf:"bytes,8,opt,name=platform,proto3" json:"platform,omitempty"`
 }
 
 func (x *GetStatusResponse) Reset()         { *x = GetStatusResponse{} }
@@ -206,11 +205,11 @@ func (x *GenerateQRRequest) Reset()         { *x = GenerateQRRequest{} }
 func (x *GenerateQRRequest) String() string { return "GenerateQRRequest" }
 
 type GenerateQRResponse struct {
-	QrPayload      string `protobuf:"bytes,1,opt,name=qr_payload,json=qrPayload,proto3" json:"qr_payload,omitempty"`
-	ProxyHost      string `protobuf:"bytes,2,opt,name=proxy_host,json=proxyHost,proto3" json:"proxy_host,omitempty"`
-	ProxyPort      uint32 `protobuf:"varint,3,opt,name=proxy_port,json=proxyPort,proto3" json:"proxy_port,omitempty"`
-	QuicPort       uint32 `protobuf:"varint,4,opt,name=quic_port,json=quicPort,proto3" json:"quic_port,omitempty"`
-	EncryptionKey  []byte `protobuf:"bytes,5,opt,name=encryption_key,json=encryptionKey,proto3" json:"encryption_key,omitempty"`
+	QrPayload       string `protobuf:"bytes,1,opt,name=qr_payload,json=qrPayload,proto3" json:"qr_payload,omitempty"`
+	ProxyHost       string `protobuf:"bytes,2,opt,name=proxy_host,json=proxyHost,proto3" json:"proxy_host,omitempty"`
+	ProxyPort       uint32 `protobuf:"varint,3,opt,name=proxy_port,json=proxyPort,proto3" json:"proxy_port,omitempty"`
+	QuicPort        uint32 `protobuf:"varint,4,opt,name=quic_port,json=quicPort,proto3" json:"quic_port,omitempty"`
+	EncryptionKey   []byte `protobuf:"bytes,5,opt,name=encryption_key,json=encryptionKey,proto3" json:"encryption_key,omitempty"`
 	ExpiresAtUnixMs int64  `protobuf:"varint,6,opt,name=expires_at_unix_ms,json=expiresAtUnixMs,proto3" json:"expires_at_unix_ms,omitempty"`
 }
 
@@ -285,20 +284,19 @@ func (x *GetPrivacyStatsRequest) Reset()         { *x = GetPrivacyStatsRequest{}
 func (x *GetPrivacyStatsRequest) String() string { return "GetPrivacyStatsRequest" }
 
 type GetPrivacyStatsResponse struct {
-	Ttl          *TTLNormalizationStats `protobuf:"bytes,1,opt,name=ttl,proto3" json:"ttl,omitempty"`
-	Fragmentation *FragmentationStats   `protobuf:"bytes,2,opt,name=fragmentation,proto3" json:"fragmentation,omitempty"`
-	UserAgent    *UserAgentStats        `protobuf:"bytes,3,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
+	Ttl           *TTLNormalizationStats `protobuf:"bytes,1,opt,name=ttl,proto3" json:"ttl,omitempty"`
+	Fragmentation *FragmentationStats    `protobuf:"bytes,2,opt,name=fragmentation,proto3" json:"fragmentation,omitempty"`
+	UserAgent     *UserAgentStats        `protobuf:"bytes,3,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
 }
-
 
 func (x *GetPrivacyStatsResponse) Reset()         { *x = GetPrivacyStatsResponse{} }
 func (x *GetPrivacyStatsResponse) String() string { return "GetPrivacyStatsResponse" }
 
 type TTLNormalizationStats struct {
-	PacketsProcessed      int64            `protobuf:"varint,1,opt,name=packets_processed,json=packetsProcessed,proto3" json:"packets_processed,omitempty"`
-	PacketsModified       int64            `protobuf:"varint,2,opt,name=packets_modified,json=packetsModified,proto3" json:"packets_modified,omitempty"`
-	Ipv4Packets           int64            `protobuf:"varint,3,opt,name=ipv4_packets,json=ipv4Packets,proto3" json:"ipv4_packets,omitempty"`
-	Ipv6Packets           int64            `protobuf:"varint,4,opt,name=ipv6_packets,json=ipv6Packets,proto3" json:"ipv6_packets,omitempty"`
+	PacketsProcessed     int64            `protobuf:"varint,1,opt,name=packets_processed,json=packetsProcessed,proto3" json:"packets_processed,omitempty"`
+	PacketsModified      int64            `protobuf:"varint,2,opt,name=packets_modified,json=packetsModified,proto3" json:"packets_modified,omitempty"`
+	Ipv4Packets          int64            `protobuf:"varint,3,opt,name=ipv4_packets,json=ipv4Packets,proto3" json:"ipv4_packets,omitempty"`
+	Ipv6Packets          int64            `protobuf:"varint,4,opt,name=ipv6_packets,json=ipv6Packets,proto3" json:"ipv6_packets,omitempty"`
 	OriginalTtlHistogram map[uint32]int64 `protobuf:"bytes,5,rep,name=original_ttl_histogram,json=originalTtlHistogram,proto3" json:"original_ttl_histogram,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
 }
 

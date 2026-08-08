@@ -20,18 +20,18 @@ import (
 
 // SOCKS5 protocol constants (RFC 1928).
 const (
-	socks5Version       = 0x05
-	socks5AuthNone      = 0x00
-	socks5AuthPassword  = 0x02
-	socks5AuthNoAccept  = 0xFF
-	socks5CmdConnect    = 0x01
-	socks5AtypIPv4      = 0x01
-	socks5AtypDomain    = 0x03
-	socks5AtypIPv6      = 0x04
-	socks5ReplySuccess  = 0x00
-	socks5ReplyFail     = 0x01
-	socks5ReplyNotAllow = 0x02
-	socks5ReplyNetUnreach = 0x03
+	socks5Version          = 0x05
+	socks5AuthNone         = 0x00
+	socks5AuthPassword     = 0x02
+	socks5AuthNoAccept     = 0xFF
+	socks5CmdConnect       = 0x01
+	socks5AtypIPv4         = 0x01
+	socks5AtypDomain       = 0x03
+	socks5AtypIPv6         = 0x04
+	socks5ReplySuccess     = 0x00
+	socks5ReplyFail        = 0x01
+	socks5ReplyNotAllow    = 0x02
+	socks5ReplyNetUnreach  = 0x03
 	socks5ReplyHostUnreach = 0x04
 	socks5ReplyConnRefused = 0x05
 )
@@ -88,12 +88,12 @@ func (a *TokenAuthenticator) RemoveToken(username string) {
 
 // Metrics tracks proxy server statistics.
 type Metrics struct {
-	ActiveConnections   atomic.Int64
-	TotalConnections    atomic.Int64
-	BytesIn             atomic.Int64
-	BytesOut            atomic.Int64
-	AuthFailures        atomic.Int64
-	ConnectionErrors    atomic.Int64
+	ActiveConnections atomic.Int64
+	TotalConnections  atomic.Int64
+	BytesIn           atomic.Int64
+	BytesOut          atomic.Int64
+	AuthFailures      atomic.Int64
+	ConnectionErrors  atomic.Int64
 }
 
 // Snapshot returns a point-in-time copy of metrics.

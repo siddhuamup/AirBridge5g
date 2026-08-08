@@ -54,10 +54,10 @@ func (s *UAHarmonizeStats) Snapshot() UAHarmonizeStatsSnapshot {
 
 // UAHarmonizerConfig configures User-Agent harmonization.
 type UAHarmonizerConfig struct {
-	TargetUA          string   // Mobile User-Agent to replace desktop UAs with
-	StripHeaders      []string // Additional headers to strip
-	StripClientHints  bool     // Strip Sec-CH-UA-* headers
-	Enabled           bool
+	TargetUA         string   // Mobile User-Agent to replace desktop UAs with
+	StripHeaders     []string // Additional headers to strip
+	StripClientHints bool     // Strip Sec-CH-UA-* headers
+	Enabled          bool
 }
 
 // DefaultUAHarmonizerConfig returns Android Chrome mobile config.

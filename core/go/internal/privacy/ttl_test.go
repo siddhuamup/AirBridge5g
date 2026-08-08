@@ -7,12 +7,12 @@ import (
 
 // buildIPv4Packet creates a minimal valid IPv4 packet for testing.
 func buildIPv4Packet(ttl byte) []byte {
-	packet := make([]byte, 20) // Minimum IPv4 header
-	packet[0] = 0x45           // Version=4, IHL=5 (20 bytes)
-	packet[1] = 0x00           // DSCP + ECN
+	packet := make([]byte, 20)                  // Minimum IPv4 header
+	packet[0] = 0x45                            // Version=4, IHL=5 (20 bytes)
+	packet[1] = 0x00                            // DSCP + ECN
 	binary.BigEndian.PutUint16(packet[2:4], 20) // Total length
-	packet[8] = ttl            // TTL
-	packet[9] = 0x06           // Protocol: TCP
+	packet[8] = ttl                             // TTL
+	packet[9] = 0x06                            // Protocol: TCP
 	// Checksum at bytes 10-11 (set to 0, recalculated)
 	// Source IP: 192.168.1.1
 	packet[12], packet[13], packet[14], packet[15] = 192, 168, 1, 1
@@ -24,11 +24,11 @@ func buildIPv4Packet(ttl byte) []byte {
 
 // buildIPv6Packet creates a minimal valid IPv6 packet for testing.
 func buildIPv6Packet(hopLimit byte) []byte {
-	packet := make([]byte, 40) // Minimum IPv6 header
-	packet[0] = 0x60           // Version=6
-	packet[7] = hopLimit       // Hop Limit
+	packet := make([]byte, 40)                 // Minimum IPv6 header
+	packet[0] = 0x60                           // Version=6
+	packet[7] = hopLimit                       // Hop Limit
 	binary.BigEndian.PutUint16(packet[4:6], 0) // Payload length
-	packet[6] = 0x06 // Next Header: TCP
+	packet[6] = 0x06                           // Next Header: TCP
 	return packet
 }
 

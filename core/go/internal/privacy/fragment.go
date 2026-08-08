@@ -11,10 +11,10 @@ import (
 
 // Fragmentation strategy constants.
 const (
-	DefaultFragmentSize    = 512   // Default max fragment size in bytes
-	MinFragmentSize        = 64    // Minimum fragment size
-	MaxFragmentSize        = 4096  // Maximum fragment size
-	TLSRecordHeaderLen     = 5    // TLS record header: type(1) + version(2) + length(2)
+	DefaultFragmentSize     = 512  // Default max fragment size in bytes
+	MinFragmentSize         = 64   // Minimum fragment size
+	MaxFragmentSize         = 4096 // Maximum fragment size
+	TLSRecordHeaderLen      = 5    // TLS record header: type(1) + version(2) + length(2)
 	TLSContentTypeHandshake = 0x16
 	TLSContentTypeAppData   = 0x17
 )
@@ -39,10 +39,10 @@ var (
 
 // FragmentStats tracks fragmentation statistics.
 type FragmentStats struct {
-	PacketsFragmented  atomic.Int64
-	FragmentsCreated   atomic.Int64
-	TLSRecordsSplit    atomic.Int64
-	BytesProcessed     atomic.Int64
+	PacketsFragmented atomic.Int64
+	FragmentsCreated  atomic.Int64
+	TLSRecordsSplit   atomic.Int64
+	BytesProcessed    atomic.Int64
 }
 
 // FragmentStatsSnapshot is an immutable view of fragmentation stats.
@@ -66,8 +66,8 @@ func (s *FragmentStats) Snapshot() FragmentStatsSnapshot {
 // FragmenterConfig configures the packet fragmenter.
 type FragmenterConfig struct {
 	Strategy       FragmentStrategy
-	MaxFragmentLen int  // Maximum bytes per fragment
-	MinFragmentLen int  // Minimum bytes per fragment (for random strategy)
+	MaxFragmentLen int // Maximum bytes per fragment
+	MinFragmentLen int // Minimum bytes per fragment (for random strategy)
 	Enabled        bool
 }
 

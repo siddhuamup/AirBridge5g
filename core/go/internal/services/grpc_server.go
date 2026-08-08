@@ -128,7 +128,6 @@ func (s *GRPCServer) SetRole(ctx context.Context, req *controlv1.SetRoleRequest)
 		return nil, status.Errorf(codes.Internal, "set role: %v", err)
 	}
 
-
 	return &controlv1.SetRoleResponse{
 		Role:        req.Role,
 		TunnelState: mapTunnelState(s.daemon.tunnelState),
@@ -289,7 +288,6 @@ func (s *GRPCServer) ListPeers(ctx context.Context, req *controlv1.ListPeersRequ
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "list peers: %v", err)
 	}
-
 
 	protoPeers := make([]*controlv1.Peer, len(peers))
 	for i, p := range peers {

@@ -17,18 +17,18 @@ import (
 
 // QUIC transport constants.
 const (
-	QUICDefaultPort    = 4433
-	QUICMaxStreams      = 256
-	QUICIdleTimeout    = 30 * time.Second
-	QUICKeepAlive      = 10 * time.Second
+	QUICDefaultPort      = 4433
+	QUICMaxStreams       = 256
+	QUICIdleTimeout      = 30 * time.Second
+	QUICKeepAlive        = 10 * time.Second
 	QUICHandshakeTimeout = 10 * time.Second
-	QUICALPNAirBridge  = "airbridge/1"
+	QUICALPNAirBridge    = "airbridge/1"
 )
 
 // QUICStats tracks QUIC transport metrics.
 type QUICStats struct {
-	ActiveStreams    atomic.Int64
-	TotalStreams     atomic.Int64
+	ActiveStreams   atomic.Int64
+	TotalStreams    atomic.Int64
 	BytesSent       atomic.Int64
 	BytesReceived   atomic.Int64
 	HandshakeErrors atomic.Int64
@@ -37,8 +37,8 @@ type QUICStats struct {
 
 // QUICStatsSnapshot is an immutable point-in-time copy.
 type QUICStatsSnapshot struct {
-	ActiveStreams    int64
-	TotalStreams     int64
+	ActiveStreams   int64
+	TotalStreams    int64
 	BytesSent       int64
 	BytesReceived   int64
 	HandshakeErrors int64
@@ -48,8 +48,8 @@ type QUICStatsSnapshot struct {
 // Snapshot returns a point-in-time copy of stats.
 func (s *QUICStats) Snapshot() QUICStatsSnapshot {
 	return QUICStatsSnapshot{
-		ActiveStreams:    s.ActiveStreams.Load(),
-		TotalStreams:     s.TotalStreams.Load(),
+		ActiveStreams:   s.ActiveStreams.Load(),
+		TotalStreams:    s.TotalStreams.Load(),
 		BytesSent:       s.BytesSent.Load(),
 		BytesReceived:   s.BytesReceived.Load(),
 		HandshakeErrors: s.HandshakeErrors.Load(),
@@ -61,7 +61,7 @@ func (s *QUICStats) Snapshot() QUICStatsSnapshot {
 type QUICConfig struct {
 	BindAddress      string
 	TLSConfig        *tls.Config
-	MaxStreams        int
+	MaxStreams       int
 	IdleTimeout      time.Duration
 	KeepAlive        time.Duration
 	HandshakeTimeout time.Duration
@@ -72,7 +72,7 @@ type QUICConfig struct {
 func DefaultQUICConfig() QUICConfig {
 	return QUICConfig{
 		BindAddress:      fmt.Sprintf("0.0.0.0:%d", QUICDefaultPort),
-		MaxStreams:        QUICMaxStreams,
+		MaxStreams:       QUICMaxStreams,
 		IdleTimeout:      QUICIdleTimeout,
 		KeepAlive:        QUICKeepAlive,
 		HandshakeTimeout: QUICHandshakeTimeout,
@@ -285,7 +285,7 @@ func (t *QUICTransport) Shutdown() error {
 // trackedStream wraps a Stream to call onClose when closed.
 type trackedStream struct {
 	Stream
-	onClose  func()
+	onClose   func()
 	closeOnce sync.Once
 }
 

@@ -22,6 +22,6 @@ type Service interface {
 
 type LibP2PConfig struct {
 	ListenAddrs []string
-	Bootstrap  []string
-	PrivateKey []byte
+	Bootstrap   []string
+	PrivateKey  []byte
 }

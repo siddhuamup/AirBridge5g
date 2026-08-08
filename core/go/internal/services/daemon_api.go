@@ -45,4 +45,3 @@ func (d *Daemon) GetTrafficSnapshot() TrafficSnapshot {
 
 	return d.currentTrafficSnapshot()
 }
-

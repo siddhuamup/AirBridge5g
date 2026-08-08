@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	version   = "1.0.0-alpha"
-	banner    = `
+	version = "1.0.0-alpha"
+	banner  = `
     ___    _      ____       _     __            ________ 
    /   |  (_)____/ __ )_____(_)___/ /___ ____   / ____/ /_
   / /| | / / ___/ __  / ___/ / __  / __  / _ \ /___ \/ __/
@@ -101,9 +101,9 @@ func main() {
 	// === Protocol Negotiation ===
 	serverCaps := protocol.DefaultCapabilities()
 	clientCaps := protocol.Capabilities{
-		AEADSuites:     []protocol.AEADSuite{protocol.AEADChaCha20Poly1305, protocol.AEADAES256GCM},
-		Transports:     []protocol.Transport{protocol.TransportQUIC, protocol.TransportSOCKS5TLS},
-		HandshakeModes: []protocol.NoisePattern{protocol.NoiseIK, protocol.NoiseXX},
+		AEADSuites:      []protocol.AEADSuite{protocol.AEADChaCha20Poly1305, protocol.AEADAES256GCM},
+		Transports:      []protocol.Transport{protocol.TransportQUIC, protocol.TransportSOCKS5TLS},
+		HandshakeModes:  []protocol.NoisePattern{protocol.NoiseIK, protocol.NoiseXX},
 		ProtocolVersion: "securemesh/1",
 	}
 	profile, err := protocol.NegotiateCapabilities(serverCaps, clientCaps)
@@ -209,4 +209,3 @@ func main() {
 	<-ctx.Done()
 	fmt.Println("\n  Shutting down gracefully...")
 }
-

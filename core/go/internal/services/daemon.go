@@ -26,8 +26,8 @@ type NodeRole int
 
 const (
 	RoleUnspecified NodeRole = iota
-	RoleMaster              // Provider: shares internet
-	RoleClient              // Receiver: consumes shared internet
+	RoleMaster               // Provider: shares internet
+	RoleClient               // Receiver: consumes shared internet
 )
 
 // String returns the role name.
@@ -102,13 +102,13 @@ type Daemon struct {
 	startedAt   time.Time
 
 	// Sub-systems
-	proxyServer    *proxy.Server
-	meshService    *mesh.LibP2PService
-	ttlNormalizer  *privacy.TTLNormalizer
-	fragmenter     *privacy.Fragmenter
-	uaHarmonizer   *privacy.UAHarmonizer
-	stateStore     storage.StateStore
-	killSwitch     *security.KillSwitch
+	proxyServer   *proxy.Server
+	meshService   *mesh.LibP2PService
+	ttlNormalizer *privacy.TTLNormalizer
+	fragmenter    *privacy.Fragmenter
+	uaHarmonizer  *privacy.UAHarmonizer
+	stateStore    storage.StateStore
+	killSwitch    *security.KillSwitch
 
 	// Traffic history for UI graphs
 	trafficHistory []TrafficSnapshot

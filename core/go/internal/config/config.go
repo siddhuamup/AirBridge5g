@@ -11,15 +11,15 @@ import (
 )
 
 type Config struct {
-	NodeID          string
+	NodeID         string
 	AEADPreference []protocol.AEADSuite
-	Storage         storage.Config
-	Tracing         observability.Config
+	Storage        storage.Config
+	Tracing        observability.Config
 }
 
 func LoadFromEnv() Config {
 	return Config{
-		NodeID:          env("SECUREMESH_NODE_ID", "local-dev-node"),
+		NodeID:         env("SECUREMESH_NODE_ID", "local-dev-node"),
 		AEADPreference: parseAEADPreference(env("SECUREMESH_AEAD", "")),
 		Storage: storage.Config{
 			Driver: env("SECUREMESH_STATE_DRIVER", "sqlite"),

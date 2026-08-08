@@ -23,12 +23,12 @@ const (
 
 // MeshStats tracks mesh networking statistics.
 type MeshStats struct {
-	ConnectedPeers    atomic.Int64
-	DiscoveredPeers   atomic.Int64
-	MessagesRelayed   atomic.Int64
-	BytesRelayed      atomic.Int64
-	ConnectionErrors  atomic.Int64
-	NATTraversals     atomic.Int64
+	ConnectedPeers   atomic.Int64
+	DiscoveredPeers  atomic.Int64
+	MessagesRelayed  atomic.Int64
+	BytesRelayed     atomic.Int64
+	ConnectionErrors atomic.Int64
+	NATTraversals    atomic.Int64
 }
 
 // MeshStatsSnapshot is an immutable view.
@@ -89,18 +89,18 @@ type LibP2PService struct {
 	publicKey []byte
 
 	// Peer tracking
-	peers    map[string]*connectedPeer
-	peersMu  sync.RWMutex
+	peers   map[string]*connectedPeer
+	peersMu sync.RWMutex
 
 	// Event subscribers
 	subscribers map[string][]chan DiscoveryEvent
 	subMu       sync.RWMutex
 
 	// Lifecycle
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	mu     sync.Mutex
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	mu      sync.Mutex
 	started bool
 }
 
@@ -456,4 +456,3 @@ func (s *LibP2PService) peerCountMetricsLoop() {
 		}
 	}
 }
-
