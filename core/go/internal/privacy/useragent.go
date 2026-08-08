@@ -89,6 +89,16 @@ func (h *UAHarmonizer) GetStats() UAHarmonizeStatsSnapshot {
 	return h.stats.Snapshot()
 }
 
+// IsEnabled returns true if UA harmonization is active.
+func (h *UAHarmonizer) IsEnabled() bool {
+	return h.cfg.Enabled
+}
+
+// SetEnabled dynamically enables or disables UA harmonization.
+func (h *UAHarmonizer) SetEnabled(enabled bool) {
+	h.cfg.Enabled = enabled
+}
+
 // HarmonizeHTTPRequest modifies an HTTP request to appear mobile-originated.
 // Returns a new request with harmonized headers (immutable pattern).
 func (h *UAHarmonizer) HarmonizeHTTPRequest(req *http.Request) *http.Request {

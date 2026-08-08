@@ -27,6 +27,9 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
   QRCredentials? _qrCredentials;
   DateTime _sessionStart = DateTime.now();
   int _peerCount = 0;
+  bool _ttlEnabled = true;
+  bool _fragEnabled = true;
+  bool _uaEnabled = true;
 
   @override
   void initState() {
@@ -107,18 +110,11 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                     context.go('/');
                   },
                 ),
-                title: Row(
+                title: const Row(
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AirBridgeColors.masterAccent,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
+                    _PulsingStatusDot(),
+                    SizedBox(width: 10),
+                    Text(
                       'MASTER NODE',
                       style: TextStyle(
                         color: AirBridgeColors.masterAccent,
@@ -173,6 +169,10 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
 
                     // Connected Devices
                     _buildConnectedDevices(),
+                    const SizedBox(height: 24),
+
+                    // Dynamic Privacy Engine Toggles
+                    _buildPrivacyToggles(),
                     const SizedBox(height: 40),
                   ]),
                 ),
@@ -251,31 +251,40 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
             ),
           ),
           const SizedBox(height: 20),
-          // QR Code
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AirBridgeColors.masterAccent.withValues(alpha: 0.2),
-                  blurRadius: 30,
-                  spreadRadius: 5,
-                ),
-              ],
+          // QR Code Entrance Transition (ANIMATION #2)
+          ScaleTransition(
+            scale: CurvedAnimation(
+              parent: _entryController,
+              curve: Curves.easeOutBack,
             ),
-            child: QrImageView(
-              data: _qrCredentials?.encode() ?? '{}',
-              version: QrVersions.auto,
-              size: 180,
-              eyeStyle: const QrEyeStyle(
-                eyeShape: QrEyeShape.roundedRect,
-                color: Color(0xFF0A1628),
-              ),
-              dataModuleStyle: const QrDataModuleStyle(
-                dataModuleShape: QrDataModuleShape.roundedRect,
-                color: Color(0xFF0A1628),
+            child: FadeTransition(
+              opacity: _entryController,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AirBridgeColors.masterAccent.withValues(alpha: 0.2),
+                      blurRadius: 30,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: QrImageView(
+                  data: _qrCredentials?.encode() ?? '{}',
+                  version: QrVersions.auto,
+                  size: 180,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.roundedRect,
+                    color: Color(0xFF0A1628),
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.roundedRect,
+                    color: Color(0xFF0A1628),
+                  ),
+                ),
               ),
             ),
           ),
@@ -454,31 +463,91 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
             ],
           ),
           const SizedBox(height: 16),
-          _DeviceRow(
-            name: 'Windows Laptop',
-            platform: 'Windows 11',
-            icon: Icons.laptop_windows_rounded,
-            color: const Color(0xFF40C4FF),
-            bytesUsed: '2.4 GB',
-            latency: '12ms',
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            child: Column(
+              key: ValueKey(_peerCount),
+              children: [
+                _DeviceRow(
+                  name: 'Windows Laptop',
+                  platform: 'Windows 11',
+                  icon: Icons.laptop_windows_rounded,
+                  color: const Color(0xFF40C4FF),
+                  bytesUsed: '2.4 GB',
+                  latency: '12ms',
+                ),
+                const Divider(color: Colors.white10, height: 24),
+                _DeviceRow(
+                  name: 'MacBook Pro',
+                  platform: 'macOS Sonoma',
+                  icon: Icons.laptop_mac_rounded,
+                  color: const Color(0xFFE040FB),
+                  bytesUsed: '1.8 GB',
+                  latency: '8ms',
+                ),
+                const Divider(color: Colors.white10, height: 24),
+                _DeviceRow(
+                  name: 'Android Tablet',
+                  platform: 'Android 14',
+                  icon: Icons.tablet_android_rounded,
+                  color: AirBridgeColors.masterAccent,
+                  bytesUsed: '890 MB',
+                  latency: '5ms',
+                ),
+              ],
+            ),
           ),
-          const Divider(color: Colors.white10, height: 24),
-          _DeviceRow(
-            name: 'MacBook Pro',
-            platform: 'macOS Sonoma',
-            icon: Icons.laptop_mac_rounded,
-            color: const Color(0xFFE040FB),
-            bytesUsed: '1.8 GB',
-            latency: '8ms',
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacyToggles() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AirBridgeColors.masterSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.shield_outlined, color: AirBridgeColors.masterAccent, size: 20),
+              SizedBox(width: 10),
+              Text(
+                'DYNAMIC PRIVACY ENGINE TOGGLES',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
           ),
-          const Divider(color: Colors.white10, height: 24),
-          _DeviceRow(
-            name: 'Android Tablet',
-            platform: 'Android 14',
-            icon: Icons.tablet_android_rounded,
-            color: AirBridgeColors.masterAccent,
-            bytesUsed: '890 MB',
-            latency: '5ms',
+          const SizedBox(height: 16),
+          _PrivacySwitch(
+            title: 'TTL Normalization',
+            subtitle: 'Masks packet TTL to 64 (Mobile OS appearance)',
+            value: _ttlEnabled,
+            onChanged: (val) => setState(() => _ttlEnabled = val),
+          ),
+          const Divider(color: Colors.white10, height: 20),
+          _PrivacySwitch(
+            title: 'Packet Fragmentation',
+            subtitle: 'Splits TLS records to prevent DPI identification',
+            value: _fragEnabled,
+            onChanged: (val) => setState(() => _fragEnabled = val),
+          ),
+          const Divider(color: Colors.white10, height: 20),
+          _PrivacySwitch(
+            title: 'User-Agent Harmonization',
+            subtitle: 'Harmonizes HTTP headers to mobile Chrome',
+            value: _uaEnabled,
+            onChanged: (val) => setState(() => _uaEnabled = val),
           ),
         ],
       ),
@@ -640,6 +709,118 @@ class _DeviceRow extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PulsingStatusDot extends StatefulWidget {
+  const _PulsingStatusDot();
+
+  @override
+  State<_PulsingStatusDot> createState() => _PulsingStatusDotState();
+}
+
+class _PulsingStatusDotState extends State<_PulsingStatusDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final scale = 1.0 + (_controller.value * 0.4);
+        final opacity = 1.0 - (_controller.value * 0.5);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Transform.scale(
+              scale: scale,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AirBridgeColors.masterAccent.withValues(alpha: opacity),
+                ),
+              ),
+            ),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AirBridgeColors.masterAccent,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PrivacySwitch extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _PrivacySwitch({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Switch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: AirBridgeColors.masterAccent,
         ),
       ],
     );

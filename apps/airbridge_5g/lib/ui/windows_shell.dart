@@ -64,7 +64,10 @@ class WindowsShell extends StatelessWidget {
   Widget _acrylicWrapper(BuildContext context, Widget child, FluentThemeData theme) {
     return Container(
       color: theme.acrylicBackgroundColor,
-      child: child,
+      child: EntrancePageTransition(
+        animation: const AlwaysStoppedAnimation(1.0),
+        child: child,
+      ),
     );
   }
 }

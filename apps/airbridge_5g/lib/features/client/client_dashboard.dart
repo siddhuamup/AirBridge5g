@@ -216,23 +216,32 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 24),
 
-                    if (!_isConnected) ...[
-                      // QR Scanner Section
-                      _buildScannerSection(),
-                      const SizedBox(height: 32),
-                      // One-Click Connect
-                      _buildOneClickConnect(),
-                      const SizedBox(height: 32),
-                      // Manual connect
-                      _buildManualConnect(),
-                    ] else ...[
-                      // Connected state
-                      _buildConnectedStatus(),
-                      const SizedBox(height: 24),
-                      _buildConnectionDetails(),
-                      const SizedBox(height: 24),
-                      _buildDisconnectButton(),
-                    ],
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 500),
+                      firstCurve: Curves.easeInOutCubic,
+                      secondCurve: Curves.easeInOutCubic,
+                      crossFadeState: !_isConnected
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      firstChild: Column(
+                        children: [
+                          _buildScannerSection(),
+                          const SizedBox(height: 32),
+                          _buildOneClickConnect(),
+                          const SizedBox(height: 32),
+                          _buildManualConnect(),
+                        ],
+                      ),
+                      secondChild: Column(
+                        children: [
+                          _buildConnectedStatus(),
+                          const SizedBox(height: 24),
+                          _buildConnectionDetails(),
+                          const SizedBox(height: 24),
+                          _buildDisconnectButton(),
+                        ],
+                      ),
+                    ),
 
                     const SizedBox(height: 40),
                   ]),

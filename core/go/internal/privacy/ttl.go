@@ -118,6 +118,16 @@ func (n *TTLNormalizer) GetStats() TTLStatsSnapshot {
 	return n.stats.Snapshot()
 }
 
+// IsEnabled returns true if TTL normalization is active.
+func (n *TTLNormalizer) IsEnabled() bool {
+	return n.cfg.Enabled
+}
+
+// SetEnabled dynamically enables or disables TTL normalization.
+func (n *TTLNormalizer) SetEnabled(enabled bool) {
+	n.cfg.Enabled = enabled
+}
+
 // NormalizePacket rewrites the TTL/Hop Limit in an IP packet.
 // The packet is modified in-place. Returns the original TTL for logging.
 func (n *TTLNormalizer) NormalizePacket(packet []byte) (originalTTL byte, err error) {

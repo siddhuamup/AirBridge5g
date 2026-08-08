@@ -106,6 +106,16 @@ func (f *Fragmenter) GetStats() FragmentStatsSnapshot {
 	return f.stats.Snapshot()
 }
 
+// IsEnabled returns true if fragmentation is active.
+func (f *Fragmenter) IsEnabled() bool {
+	return f.cfg.Enabled
+}
+
+// SetEnabled dynamically enables or disables packet fragmentation.
+func (f *Fragmenter) SetEnabled(enabled bool) {
+	f.cfg.Enabled = enabled
+}
+
 // Fragment splits a data payload into smaller segments.
 // Returns a slice of fragments that, when concatenated, reproduce the original payload.
 func (f *Fragmenter) Fragment(payload []byte) ([][]byte, error) {

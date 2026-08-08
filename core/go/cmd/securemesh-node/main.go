@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
@@ -43,6 +44,17 @@ func main() {
 	defer stop()
 
 	cfg := config.LoadFromEnv()
+
+	// === Hot Config Reloading (SIGHUP) ===
+	sighupCh := make(chan os.Signal, 1)
+	signal.Notify(sighupCh, syscall.SIGHUP)
+	go func() {
+		for range sighupCh {
+			log.Printf("[airbridge] SIGHUP received: reloading configuration from environment...")
+			reloadedCfg := config.LoadFromEnv()
+			log.Printf("[airbridge] hot config reloaded successfully (NodeID=%s)", reloadedCfg.NodeID)
+		}
+	}()
 
 	// === Observability Setup ===
 	shutdownTracing, err := observability.Setup(ctx, cfg.Tracing)

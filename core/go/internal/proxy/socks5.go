@@ -456,6 +456,11 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	closeSockets := func() {
+		_ = client.SetDeadline(time.Now())
+		_ = target.SetDeadline(time.Now())
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -463,6 +468,7 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 	go func() {
 		defer wg.Done()
 		defer cancel()
+		defer closeSockets()
 		n, _ := io.CopyBuffer(target, client, make([]byte, s.cfg.RelayBufSize))
 		s.metrics.BytesIn.Add(n)
 	}()
@@ -471,21 +477,16 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 	go func() {
 		defer wg.Done()
 		defer cancel()
+		defer closeSockets()
 		n, _ := io.CopyBuffer(client, target, make([]byte, s.cfg.RelayBufSize))
 		s.metrics.BytesOut.Add(n)
 	}()
 
-	// Wait for context cancellation or relay completion
-	relayDone := make(chan struct{})
+	// Context cancellation watchdog
 	go func() {
-		select {
-		case <-ctx.Done():
-			client.SetDeadline(time.Now())
-			target.SetDeadline(time.Now())
-		case <-relayDone:
-		}
+		<-ctx.Done()
+		closeSockets()
 	}()
 
 	wg.Wait()
-	close(relayDone)
 }

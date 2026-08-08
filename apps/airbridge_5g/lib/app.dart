@@ -58,6 +58,8 @@ class AirBridgeApp extends ConsumerWidget {
       themeMode: themeMode,
       theme: _materialLightTheme(role),
       darkTheme: _materialDarkTheme(role),
+      themeAnimationDuration: const Duration(milliseconds: 500),
+      themeAnimationCurve: Curves.easeInOutCubic,
     );
   }
 

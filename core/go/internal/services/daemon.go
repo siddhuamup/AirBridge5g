@@ -390,18 +390,20 @@ func (d *Daemon) collectTrafficStats() {
 			now := time.Now()
 			elapsed := now.Sub(prevTime).Seconds()
 
-			if elapsed > 0 {
-				bytesInDiff := snapshot.BytesIn - prevIn
-				if bytesInDiff < 0 {
-					bytesInDiff = 0
-				}
-				bytesOutDiff := snapshot.BytesOut - prevOut
-				if bytesOutDiff < 0 {
-					bytesOutDiff = 0
-				}
-				snapshot.ThroughputInBPS = float64(bytesInDiff) * 8 / elapsed
-				snapshot.ThroughputOutBPS = float64(bytesOutDiff) * 8 / elapsed
+			if elapsed <= 0 {
+				elapsed = 1.0 // Guard against NTP time sync jumps
 			}
+
+			bytesInDiff := snapshot.BytesIn - prevIn
+			if bytesInDiff < 0 {
+				bytesInDiff = 0
+			}
+			bytesOutDiff := snapshot.BytesOut - prevOut
+			if bytesOutDiff < 0 {
+				bytesOutDiff = 0
+			}
+			snapshot.ThroughputInBPS = float64(bytesInDiff) * 8 / elapsed
+			snapshot.ThroughputOutBPS = float64(bytesOutDiff) * 8 / elapsed
 
 			snapshot.Timestamp = now
 			prevIn = snapshot.BytesIn
@@ -464,4 +466,39 @@ func extractPort(address string) int {
 	port := 1080
 	fmt.Sscanf(portStr, "%d", &port)
 	return port
+}
+
+// PrivacyConfig contains runtime toggle settings for the privacy engine.
+type PrivacyConfig struct {
+	TTLEnabled         bool `json:"ttl_enabled"`
+	FragmenterEnabled  bool `json:"fragmenter_enabled"`
+	UAHarmonizeEnabled bool `json:"ua_harmonize_enabled"`
+}
+
+// GetPrivacyConfig returns current privacy engine state.
+func (d *Daemon) GetPrivacyConfig() PrivacyConfig {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return PrivacyConfig{
+		TTLEnabled:         d.ttlNormalizer != nil && d.ttlNormalizer.IsEnabled(),
+		FragmenterEnabled:  d.fragmenter != nil && d.fragmenter.IsEnabled(),
+		UAHarmonizeEnabled: d.uaHarmonizer != nil && d.uaHarmonizer.IsEnabled(),
+	}
+}
+
+// SetPrivacyConfig dynamically enables/disables privacy features at runtime.
+func (d *Daemon) SetPrivacyConfig(cfg PrivacyConfig) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.ttlNormalizer != nil {
+		d.ttlNormalizer.SetEnabled(cfg.TTLEnabled)
+	}
+	if d.fragmenter != nil {
+		d.fragmenter.SetEnabled(cfg.FragmenterEnabled)
+	}
+	if d.uaHarmonizer != nil {
+		d.uaHarmonizer.SetEnabled(cfg.UAHarmonizeEnabled)
+	}
+	log.Printf("[airbridge-daemon] privacy config updated: TTL=%v Frag=%v UA=%v",
+		cfg.TTLEnabled, cfg.FragmenterEnabled, cfg.UAHarmonizeEnabled)
 }
