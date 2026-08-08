@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:grpc/grpc.dart';
 import 'daemon_client.dart';
 import '../providers/role_provider.dart' as app;
@@ -113,16 +112,16 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
   @override
   Future<List<Map<String, dynamic>>> getConnectedPeers() async {
     return _retryCall('getConnectedPeers', () async {
-      final response = await _client.getStatus(pb.GetStatusRequest());
-      if (response.platform.isNotEmpty && response.platform.startsWith('[')) {
-        try {
-          final List<dynamic> decoded = jsonDecode(response.platform);
-          return decoded.map((e) => e as Map<String, dynamic>).toList();
-        } catch (_) {
-          return [];
-        }
-      }
-      return [];
+      final response = await _client.listPeers(pb.ListPeersRequest());
+      return response.peers.map((peer) {
+        return {
+          'id': peer.id,
+          'endpoint': peer.endpoint,
+          'platform': peer.platform,
+          'connected_at_unix_ms': peer.stats.connectedAtUnixMs.toInt(),
+          'latency_ms': peer.stats.latencyMs,
+        };
+      }).toList();
     });
   }
 

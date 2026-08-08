@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -64,19 +63,4 @@ func (d *Daemon) GetTrafficSnapshot() TrafficSnapshot {
 	return d.currentTrafficSnapshot()
 }
 
-// GetPeersJSON returns a JSON representation of connected peers.
-func (d *Daemon) GetPeersJSON() string {
-	d.mu.RLock()
-	meshSvc := d.meshService
-	d.mu.RUnlock()
 
-	if meshSvc == nil {
-		return "[]"
-	}
-	peers := meshSvc.ListConnectedPeers()
-	b, err := json.Marshal(peers)
-	if err != nil {
-		return "[]"
-	}
-	return string(b)
-}

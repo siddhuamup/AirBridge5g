@@ -45,6 +45,10 @@ class ControlPlaneClient extends $grpc.Client {
       '/airbridge.control.v1.ControlPlane/StreamTrafficStats',
       ($0.StreamTrafficStatsRequest value) => value.writeToBuffer(),
       ($core.List<$core.int> value) => $0.TrafficStatsUpdate.fromBuffer(value));
+  static final _$listPeers = $grpc.ClientMethod<$0.ListPeersRequest, $0.ListPeersResponse>(
+      '/airbridge.control.v1.ControlPlane/ListPeers',
+      ($0.ListPeersRequest value) => value.writeToBuffer(),
+      ($core.List<$core.int> value) => $0.ListPeersResponse.fromBuffer(value));
 
   ControlPlaneClient($grpc.ClientChannel channel, {$grpc.CallOptions? options, $core.Iterable<$grpc.ClientInterceptor>? interceptors})
       : super(channel, options: options, interceptors: interceptors);
@@ -71,5 +75,9 @@ class ControlPlaneClient extends $grpc.Client {
 
   $grpc.ResponseStream<$0.TrafficStatsUpdate> streamTrafficStats($0.StreamTrafficStatsRequest request, {$grpc.CallOptions? options}) {
     return $createStreamingCall(_$streamTrafficStats, $async.Stream.fromIterable([request]), options: options);
+  }
+
+  $grpc.ResponseFuture<$0.ListPeersResponse> listPeers($0.ListPeersRequest request, {$grpc.CallOptions? options}) {
+    return $createUnaryCall(_$listPeers, request, options: options);
   }
 }
