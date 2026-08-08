@@ -145,6 +145,7 @@ func main() {
 	proxyCfg := proxy.DefaultServerConfig()
 	// Dynamic token authenticator — populated via QR credential exchange at runtime
 	proxyCfg.Auth = proxy.NewTokenAuthenticator(make(map[string]string))
+	proxyCfg.TTLNormalizer = ttlNorm
 	proxyCfg.Fragmenter = fragmenter
 	proxyCfg.UAHarmonizer = uaHarmonizer
 	proxyServer := proxy.NewServer(proxyCfg)

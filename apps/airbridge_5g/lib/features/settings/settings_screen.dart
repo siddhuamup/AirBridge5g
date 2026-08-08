@@ -74,7 +74,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 accentColor: accentColor,
                 trailing: Switch(
                   value: _dohEnabled,
-                  onChanged: (val) => setState(() => _dohEnabled = val),
+                  onChanged: (val) {
+                    setState(() => _dohEnabled = val);
+                    _syncDaemonPrivacy();
+                  },
                   activeColor: accentColor,
                 ),
               ),
@@ -87,7 +90,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 accentColor: accentColor,
                 trailing: Switch(
                   value: _killSwitchEnabled,
-                  onChanged: (val) => setState(() => _killSwitchEnabled = val),
+                  onChanged: (val) {
+                    setState(() => _killSwitchEnabled = val);
+                    _syncDaemonPrivacy();
+                  },
                   activeColor: accentColor,
                 ),
               ),

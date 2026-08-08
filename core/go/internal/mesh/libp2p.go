@@ -105,9 +105,10 @@ type LibP2PService struct {
 }
 
 type connectedPeer struct {
-	info      PeerInfo
+	info        PeerInfo
 	connectedAt time.Time
-	lastSeen  time.Time
+	lastSeen    time.Time
+	conn        net.Conn
 }
 
 // NewLibP2PService creates a new mesh networking service.
@@ -207,6 +208,16 @@ func (s *LibP2PService) Stop(ctx context.Context) error {
 		return ctx.Err()
 	}
 
+	// Close all active peer connections
+	s.peersMu.Lock()
+	for id, p := range s.peers {
+		if p.conn != nil {
+			_ = p.conn.Close()
+		}
+		delete(s.peers, id)
+	}
+	s.peersMu.Unlock()
+
 	// Close all subscriber channels
 	s.subMu.Lock()
 	for topic, subs := range s.subscribers {
@@ -230,18 +241,17 @@ func (s *LibP2PService) Connect(ctx context.Context, peer PeerInfo) error {
 		return ErrSelfConnect
 	}
 
-	// Dial peer address if provided to verify real network connectivity
+	// Dial peer address if provided and maintain persistent connection
+	var activeConn net.Conn
 	if len(peer.Addrs) > 0 {
-		dialed := false
 		for _, addr := range peer.Addrs {
 			conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 			if err == nil {
-				conn.Close()
-				dialed = true
+				activeConn = conn
 				break
 			}
 		}
-		if !dialed {
+		if activeConn == nil {
 			log.Printf("[airbridge-mesh] peer %s addrs %v unreachable", peer.ID, peer.Addrs)
 		}
 	}
@@ -249,11 +259,16 @@ func (s *LibP2PService) Connect(ctx context.Context, peer PeerInfo) error {
 	s.peersMu.Lock()
 	defer s.peersMu.Unlock()
 
+	if existing, ok := s.peers[peer.ID]; ok && existing.conn != nil {
+		_ = existing.conn.Close()
+	}
+
 	now := time.Now().UTC()
 	s.peers[peer.ID] = &connectedPeer{
 		info:        peer,
 		connectedAt: now,
 		lastSeen:    now,
+		conn:        activeConn,
 	}
 
 	s.stats.ConnectedPeers.Store(int64(len(s.peers)))
@@ -275,6 +290,9 @@ func (s *LibP2PService) Disconnect(peerID string) error {
 	peer, ok := s.peers[peerID]
 	if !ok {
 		return ErrPeerNotFound
+	}
+	if peer.conn != nil {
+		_ = peer.conn.Close()
 	}
 
 	delete(s.peers, peerID)

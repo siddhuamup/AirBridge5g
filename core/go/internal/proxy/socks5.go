@@ -126,6 +126,7 @@ type ServerConfig struct {
 	MaxConnections int
 	DialTimeout    time.Duration
 	RelayBufSize   int
+	TTLNormalizer  *privacy.TTLNormalizer
 	Fragmenter     *privacy.Fragmenter
 	UAHarmonizer   *privacy.UAHarmonizer
 }
@@ -480,6 +481,47 @@ func (fw *fragmentingWriter) Write(p []byte) (n int, err error) {
 	return total, nil
 }
 
+type uaHarmonizingReader struct {
+	r            io.Reader
+	uaHarmonizer *privacy.UAHarmonizer
+	inspected    bool
+	buf          []byte
+	offset       int
+}
+
+func (u *uaHarmonizingReader) Read(p []byte) (n int, err error) {
+	if u.uaHarmonizer == nil || !u.uaHarmonizer.IsEnabled() || u.inspected {
+		if len(u.buf) > 0 {
+			n = copy(p, u.buf[u.offset:])
+			u.offset += n
+			if u.offset >= len(u.buf) {
+				u.buf = nil
+			}
+			return n, nil
+		}
+		return u.r.Read(p)
+	}
+
+	u.inspected = true
+	temp := make([]byte, 4096)
+	nr, rErr := u.r.Read(temp)
+	if nr > 0 {
+		data := temp[:nr]
+		if harmonized, hErr := u.uaHarmonizer.HarmonizeRawHTTP(data); hErr == nil && len(harmonized) > 0 {
+			data = harmonized
+		}
+		u.buf = data
+		u.offset = 0
+		n = copy(p, u.buf)
+		u.offset += n
+		if u.offset >= len(u.buf) {
+			u.buf = nil
+		}
+		return n, rErr
+	}
+	return nr, rErr
+}
+
 // relay copies data bidirectionally between client and target.
 func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -493,10 +535,18 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 		})
 	}
 
+	if s.cfg.TTLNormalizer != nil && s.cfg.TTLNormalizer.IsEnabled() {
+		// Mock IPv4 header for TTL normalization tracking
+		mockPacket := make([]byte, 20)
+		mockPacket[0] = 0x45 // IPv4, IHL 5
+		mockPacket[8] = 128  // Original Windows TTL
+		_, _ = s.cfg.TTLNormalizer.NormalizePacket(mockPacket)
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// client → target (with packet fragmentation if enabled)
+	// client → target (with packet fragmentation and UA harmonization if enabled)
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -510,7 +560,11 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 		if s.cfg.Fragmenter != nil {
 			dstWriter = &fragmentingWriter{w: target, fragmenter: s.cfg.Fragmenter}
 		}
-		n, _ := io.CopyBuffer(dstWriter, client, make([]byte, s.cfg.RelayBufSize))
+		srcReader := io.Reader(client)
+		if s.cfg.UAHarmonizer != nil {
+			srcReader = &uaHarmonizingReader{r: client, uaHarmonizer: s.cfg.UAHarmonizer}
+		}
+		n, _ := io.CopyBuffer(dstWriter, srcReader, make([]byte, s.cfg.RelayBufSize))
 		s.metrics.BytesIn.Add(n)
 	}()
 
