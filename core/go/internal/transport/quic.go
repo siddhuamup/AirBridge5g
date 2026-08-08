@@ -217,6 +217,31 @@ func (t *QUICTransport) Listen(ctx context.Context, profile protocol.SessionProf
 		return nil, fmt.Errorf("quic listen on %s: %w", t.cfg.BindAddress, err)
 	}
 
+	// Bind UDP socket for QUIC datagram packet listener
+	if udpAddr, err := net.ResolveUDPAddr("udp", t.cfg.BindAddress); err == nil {
+		if udpConn, err := net.ListenUDP("udp", udpAddr); err == nil {
+			log.Printf("[airbridge-quic] UDP datagram socket listening on %s", udpAddr)
+			go func() {
+				buf := make([]byte, 2048)
+				for {
+					t.mu.Lock()
+					canceled := t.ctx != nil && t.ctx.Err() != nil
+					t.mu.Unlock()
+					if canceled {
+						udpConn.Close()
+						return
+					}
+					udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
+					_, _, err := udpConn.ReadFromUDP(buf)
+					if err != nil && t.ctx != nil && t.ctx.Err() != nil {
+						udpConn.Close()
+						return
+					}
+				}
+			}()
+		}
+	}
+
 	log.Printf("[airbridge-quic] listening on %s (ALPN=%s)", t.cfg.BindAddress, QUICALPNAirBridge)
 
 	t.streamCh = make(chan Stream, t.cfg.MaxStreams)

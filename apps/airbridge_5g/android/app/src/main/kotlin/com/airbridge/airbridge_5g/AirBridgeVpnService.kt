@@ -110,15 +110,38 @@ class AirBridgeVpnService : VpnService() {
             val socket = Socket()
             protect(socket) // Bypass TUN interface to avoid loop
             socket.connect(InetSocketAddress(proxyHost, proxyPort), 5000)
+            socket.soTimeout = 5000
             
             val out = socket.getOutputStream()
-            out.write(byteArrayOf(0x05, 0x01, 0x00)) // SOCKS5 initial handshake
+            val socketIn = socket.getInputStream()
+
+            // 1. SOCKS5 Method Negotiation (VER=5, NMETHODS=1, METHOD=NO AUTH)
+            out.write(byteArrayOf(0x05, 0x01, 0x00))
             out.flush()
 
+            val methodResp = ByteArray(2)
+            if (socketIn.read(methodResp) < 2 || methodResp[0] != 0x05.toByte()) {
+                throw IllegalStateException("SOCKS5 method negotiation failed")
+            }
+
+            // 2. SOCKS5 CONNECT Command (VER=5, CMD=1 CONNECT, RSV=0, ATYP=1 IPv4: 0.0.0.0:80)
+            val connectReq = byteArrayOf(
+                0x05, 0x01, 0x00, 0x01,
+                0x00, 0x00, 0x00, 0x00, // Destination IP 0.0.0.0
+                0x00, 0x50              // Destination Port 80
+            )
+            out.write(connectReq)
+            out.flush()
+
+            val connectResp = ByteArray(10)
+            if (socketIn.read(connectResp) < 4 || connectResp[1] != 0x00.toByte()) {
+                Log.w(TAG, "SOCKS5 CONNECT reply code: ${connectResp[1]}")
+            }
+
+            socket.soTimeout = 0 // Clear handshake timeout for streaming
             relaySocket = socket
 
-            // Background thread to relay incoming socket data back to TUN outputStream
-            val socketIn = socket.getInputStream()
+            // Background thread to relay incoming SOCKS data back to TUN outputStream
             Thread {
                 val inBuf = ByteArray(32767)
                 try {
@@ -142,7 +165,7 @@ class AirBridgeVpnService : VpnService() {
             }
         } catch (e: Exception) {
             if (isRunning) {
-                Log.e(TAG, "Packet forwarding loop error", e)
+                Log.e(TAG, "SOCKS5 relay tunnel error", e)
             }
         } finally {
             try { relaySocket?.close() } catch (_: Exception) {}
