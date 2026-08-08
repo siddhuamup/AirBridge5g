@@ -6,7 +6,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 /// OTA Update Manager — checks for new versions and prompts the user to update.
 class OtaUpdateManager {
-  static const String _updateUrl = 'https://api.github.com/repos/airbridge-5g/releases/latest';
+  static const String _updateUrl = 'https://api.github.com/repos/siddhuamup/AirBridge5g/releases/latest';
+  static const String _fallbackUrl = 'https://github.com/siddhuamup/AirBridge5g/releases';
 
   /// Checks if a new version is available.
   static Future<UpdateInfo?> checkForUpdate() async {
@@ -27,14 +28,14 @@ class OtaUpdateManager {
         final data = response.data;
         final latestVersion = (data['tag_name'] as String).replaceAll('v', '');
         final releaseNotes = data['body'] as String? ?? 'Bug fixes and improvements.';
-        final downloadUrl = _getDownloadUrl(data['assets'] as List);
+        final downloadUrl = _getDownloadUrl(data['assets'] as List? ?? []);
 
         if (_isNewerVersion(currentVersion, latestVersion)) {
           return UpdateInfo(
             currentVersion: currentVersion,
             latestVersion: latestVersion,
             releaseNotes: releaseNotes,
-            downloadUrl: downloadUrl,
+            downloadUrl: downloadUrl.isNotEmpty ? downloadUrl : _fallbackUrl,
           );
         }
       }
@@ -46,15 +47,17 @@ class OtaUpdateManager {
 
   /// Compares semantic versions (e.g., "1.0.0" vs "1.1.0").
   static bool _isNewerVersion(String current, String latest) {
-    final currentParts = current.split('.').map(int.parse).toList();
-    final latestParts = latest.split('.').map(int.parse).toList();
+    try {
+      final currentParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final latestParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
 
-    for (int i = 0; i < 3; i++) {
-      final c = i < currentParts.length ? currentParts[i] : 0;
-      final l = i < latestParts.length ? latestParts[i] : 0;
-      if (l > c) return true;
-      if (l < c) return false;
-    }
+      for (int i = 0; i < 3; i++) {
+        final c = i < currentParts.length ? currentParts[i] : 0;
+        final l = i < latestParts.length ? latestParts[i] : 0;
+        if (l > c) return true;
+        if (l < c) return false;
+      }
+    } catch (_) {}
     return false;
   }
 
@@ -67,16 +70,36 @@ class OtaUpdateManager {
             : Platform.isLinux
                 ? 'linux'
                 : Platform.isAndroid
-                    ? 'android'
-                    : 'ios';
+                    ? 'apk'
+                    : 'ipa';
 
     for (final asset in assets) {
-      final name = (asset['name'] as String).toLowerCase();
-      if (name.contains(platformKey)) {
-        return asset['browser_download_url'] as String;
+      if (asset is Map) {
+        final name = (asset['name'] as String? ?? '').toLowerCase();
+        if (name.contains(platformKey)) {
+          return asset['browser_download_url'] as String? ?? '';
+        }
       }
     }
     return '';
+  }
+
+  /// Opens the target URL in system default browser.
+  static Future<void> _launchDownloadUrl(String url) async {
+    final targetUrl = url.isNotEmpty ? url : _fallbackUrl;
+    try {
+      if (Platform.isWindows) {
+        await Process.run('cmd', ['/c', 'start', targetUrl]);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [targetUrl]);
+      } else if (Platform.isLinux) {
+        await Process.run('xdg-open', [targetUrl]);
+      } else {
+        debugPrint('[OTA] Opening download URL: $targetUrl');
+      }
+    } catch (e) {
+      debugPrint('[OTA] Error launching download URL: $e');
+    }
   }
 
   /// Shows an update dialog to the user.
@@ -105,8 +128,7 @@ class OtaUpdateManager {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // In production, open browser or trigger in-app download
-              debugPrint('[OTA] Download: ${info.downloadUrl}');
+              _launchDownloadUrl(info.downloadUrl);
             },
             child: const Text('Update Now'),
           ),

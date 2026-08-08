@@ -38,63 +38,69 @@ class VpnMethodChannelHandler: NSObject {
         }
     }
     
-    private func loadManager() {
+    private func getManager(completion: @escaping (NETunnelProviderManager) -> Void) {
+        if let mgr = manager {
+            completion(mgr)
+            return
+        }
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
             if let error = error {
                 NSLog("[AirBridge-iOS] Failed to load VPN managers: \(error)")
-                return
             }
-            self?.manager = managers?.first ?? NETunnelProviderManager()
+            let mgr = managers?.first ?? NETunnelProviderManager()
+            self?.manager = mgr
+            completion(mgr)
         }
     }
     
     private func startVpn(host: String, port: Int, result: @escaping FlutterResult) {
-        let mgr = manager ?? NETunnelProviderManager()
-        self.manager = mgr
-        
-        let proto = NETunnelProviderProtocol()
-        proto.providerBundleIdentifier = "com.airbridge.airbridge5g.tunnel"
-        proto.serverAddress = "\(host):\(port)"
-        
-        // Configure SOCKS proxy via NEProxySettings
-        let proxySettings = NEProxySettings()
-        proxySettings.socksEnabled = true
-        proxySettings.socksServer = NEProxyServer(address: host, port: port)
-        proxySettings.matchDomains = [""] // Route all domains through proxy
-        proto.proxySettings = proxySettings
-        
-        // Provider configuration passed to the tunnel extension
-        proto.providerConfiguration = [
-            "proxy_host": host,
-            "proxy_port": port
-        ]
-        
-        mgr.protocolConfiguration = proto
-        mgr.localizedDescription = "AirBridge 5G"
-        mgr.isEnabled = true
-        
-        mgr.saveToPreferences { [weak self] error in
-            if let error = error {
-                NSLog("[AirBridge-iOS] Save VPN preferences failed: \(error)")
-                result(false)
-                return
-            }
+        getManager { [weak self] mgr in
+            self?.manager = mgr
             
-            // Reload after save (required by iOS)
-            mgr.loadFromPreferences { error in
+            let proto = NETunnelProviderProtocol()
+            proto.providerBundleIdentifier = "com.airbridge.airbridge5g.tunnel"
+            proto.serverAddress = "\(host):\(port)"
+            
+            // Configure SOCKS proxy via NEProxySettings
+            let proxySettings = NEProxySettings()
+            proxySettings.socksEnabled = true
+            proxySettings.socksServer = NEProxyServer(address: host, port: port)
+            proxySettings.matchDomains = [""] // Route all domains through proxy
+            proto.proxySettings = proxySettings
+            
+            // Provider configuration passed to the tunnel extension
+            proto.providerConfiguration = [
+                "proxy_host": host,
+                "proxy_port": port
+            ]
+            
+            mgr.protocolConfiguration = proto
+            mgr.localizedDescription = "AirBridge 5G"
+            mgr.isEnabled = true
+            
+            mgr.saveToPreferences { error in
                 if let error = error {
-                    NSLog("[AirBridge-iOS] Reload VPN preferences failed: \(error)")
+                    NSLog("[AirBridge-iOS] Save VPN preferences failed: \(error)")
                     result(false)
                     return
                 }
                 
-                do {
-                    try mgr.connection.startVPNTunnel()
-                    NSLog("[AirBridge-iOS] VPN tunnel started → \(host):\(port)")
-                    result(true)
-                } catch {
-                    NSLog("[AirBridge-iOS] Start VPN tunnel failed: \(error)")
-                    result(false)
+                // Reload after save (required by iOS)
+                mgr.loadFromPreferences { error in
+                    if let error = error {
+                        NSLog("[AirBridge-iOS] Reload VPN preferences failed: \(error)")
+                        result(false)
+                        return
+                    }
+                    
+                    do {
+                        try mgr.connection.startVPNTunnel()
+                        NSLog("[AirBridge-iOS] VPN tunnel started → \(host):\(port)")
+                        result(true)
+                    } catch {
+                        NSLog("[AirBridge-iOS] Start VPN tunnel failed: \(error)")
+                        result(false)
+                    }
                 }
             }
         }

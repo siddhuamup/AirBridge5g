@@ -53,5 +53,16 @@
 		<string>processing</string>
 		<string>fetch</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>airbridge</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.airbridge.airbridge5g</string>
+		</dict>
+	</array>
 </dict>
 </plist>

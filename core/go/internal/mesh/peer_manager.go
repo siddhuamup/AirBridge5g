@@ -77,20 +77,15 @@ func (pm *PeerManager) UnblockPeer(peerID string) error {
 
 // IsBlocked checks if a peer is currently blocked.
 func (pm *PeerManager) IsBlocked(peerID string) bool {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
 
 	blockedUntil, ok := pm.blocked[peerID]
 	if !ok {
 		return false
 	}
 	if time.Now().After(blockedUntil) {
-		// Ban expired — clean up
-		pm.mu.RUnlock()
-		pm.mu.Lock()
 		delete(pm.blocked, peerID)
-		pm.mu.Unlock()
-		pm.mu.RLock()
 		return false
 	}
 	return true

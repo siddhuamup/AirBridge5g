@@ -16,6 +16,18 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  String _t(String key, String locale) {
+    const translations = {
+      'Settings': {'hi': 'सेटिंग्स', 'mr': 'सेटिंग्ज', 'es': 'Ajustes', 'fr': 'Paramètres', 'de': 'Einstellungen', 'ja': '設定', 'zh': '设置', 'ar': 'الإعدادات', 'pt': 'Configurações'},
+      'Appearance': {'hi': 'दिखावट', 'mr': 'दिसणे', 'es': 'Apariencia', 'fr': 'Apparence', 'de': 'Erscheinungsbild', 'ja': '外観', 'zh': '外观', 'ar': 'المظهر', 'pt': 'Aparência'},
+      'Network': {'hi': 'नेटवर्क', 'mr': 'नेटवर्क', 'es': 'Red', 'fr': 'Réseau', 'de': 'Netzwerk', 'ja': 'ネットワーク', 'zh': '网络', 'ar': 'الشبكة', 'pt': 'Rede'},
+      'Privacy Engine': {'hi': 'प्राइवेसी इंजन', 'mr': 'प्रायव्हसी इंजिन', 'es': 'Motor de Privacidad', 'fr': 'Moteur de Confidentialité', 'de': 'Datenschutz-Engine', 'ja': 'プライバシーエンジン', 'zh': '隐私引擎', 'ar': 'محرك الخصوصية', 'pt': 'Motor de Privacidade'},
+      'About': {'hi': 'के बारे में', 'mr': 'बद्दल', 'es': 'Acerca de', 'fr': 'À propos', 'de': 'Über', 'ja': '情報', 'zh': '关于', 'ar': 'حول', 'pt': 'Sobre'},
+      'Dark Mode': {'hi': 'डार्क मोड', 'mr': 'डार्क मोड', 'es': 'Modo Oscuro', 'fr': 'Mode Sombre', 'de': 'Dunkelmodus', 'ja': 'ダークモード', 'zh': '深色模式', 'ar': 'الوضع الداكن', 'pt': 'Modo Escuro'},
+      'Language': {'hi': 'भाषा', 'mr': 'भाषा', 'es': 'Idioma', 'fr': 'Langue', 'de': 'Sprache', 'ja': '言語', 'zh': '语言', 'ar': 'اللغة', 'pt': 'Idioma'},
+    };
+    return translations[key]?[locale] ?? key;
+  }
 
   Future<void> _syncDaemonPrivacy() async {
     try {
@@ -54,7 +66,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          'Settings',
+          _t('Settings', settings.locale),
           style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
         ),
         iconTheme: IconThemeData(color: textColor),
@@ -63,13 +75,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         children: [
           // Appearance Section
-          _SectionHeader(title: 'Appearance', color: textColor),
+          _SectionHeader(title: _t('Appearance', settings.locale), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [
               _SettingsTile(
                 icon: Icons.dark_mode_rounded,
-                title: 'Dark Mode',
+                title: _t('Dark Mode', settings.locale),
                 subtitle: settings.darkMode ? 'Enabled' : 'Disabled',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -86,7 +98,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.language_rounded,
-                title: 'Language',
+                title: _t('Language', settings.locale),
                 subtitle: _languageName(settings.locale),
                 textColor: textColor,
                 accentColor: accentColor,
@@ -118,7 +130,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // Network Section
-          _SectionHeader(title: 'Network', color: textColor),
+          _SectionHeader(title: _t('Network', settings.locale), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [
@@ -184,7 +196,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     DropdownMenuItem(value: 10240, child: Text('10 Mbps')),
                   ],
                   onChanged: (val) {
-                    if (val != null) settingsNotifier.setBandwidthLimit(val);
+                    if (val != null) {
+                      settingsNotifier.setBandwidthLimit(val);
+                      _syncDaemonPrivacy();
+                    }
                   },
                 ),
               ),
@@ -194,7 +209,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // Privacy Section
-          _SectionHeader(title: 'Privacy Engine', color: textColor),
+          _SectionHeader(title: _t('Privacy Engine', settings.locale), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [

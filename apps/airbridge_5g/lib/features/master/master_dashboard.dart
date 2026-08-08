@@ -10,6 +10,7 @@ import '../../providers/role_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/daemon_provider.dart';
 import '../../utils/crypto_utils.dart';
+import 'qr_rotation_countdown.dart';
 
 /// Master Dashboard — Dark Navy + Radiant Green theme.
 /// Shows QR code generator, real-time traffic graph, connected devices, and session timer.
@@ -315,11 +316,13 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
             ),
           ),
           const SizedBox(height: 16),
+          QrRotationCountdown(onRotate: _fetchDaemonStatus),
+          const SizedBox(height: 12),
           // Refresh button
           TextButton.icon(
             onPressed: _fetchDaemonStatus,
             icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Regenerate'),
+            label: const Text('Regenerate Credentials'),
             style: TextButton.styleFrom(
               foregroundColor: AirBridgeColors.masterAccent,
             ),
