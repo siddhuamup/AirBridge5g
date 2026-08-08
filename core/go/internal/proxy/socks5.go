@@ -483,10 +483,15 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 	}()
 
 	// Context cancellation watchdog
+	relayDone := make(chan struct{})
 	go func() {
-		<-ctx.Done()
-		closeSockets()
+		select {
+		case <-ctx.Done():
+			closeSockets()
+		case <-relayDone:
+		}
 	}()
 
 	wg.Wait()
+	close(relayDone)
 }
