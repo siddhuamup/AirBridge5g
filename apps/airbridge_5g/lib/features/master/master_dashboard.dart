@@ -69,6 +69,9 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
           _qrCredentials = creds;
           _peerCount = peers;
         });
+        
+        // Trigger QR entrance animation again to make regenerate button feel alive
+        _entryController.forward(from: 0.5);
       }
     } catch (e) {
       if (mounted) {
@@ -87,7 +90,13 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         fragmenterEnabled: _fragEnabled,
         uaHarmonizeEnabled: _uaEnabled,
       );
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to sync privacy config: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -499,20 +508,17 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                 : Column(
                     key: ValueKey(_peerCount),
                     children: List.generate(_peerCount, (index) {
-                      final names = ['Client Device Alpha', 'Client Device Beta', 'Client Device Gamma'];
-                      final name = index < names.length ? names[index] : 'Client Peer #${index + 1}';
-                      final platforms = ['Android Device', 'iOS Device', 'Windows Client'];
-                      final platform = platforms[index % platforms.length];
+                      final name = 'Connected Peer #${index + 1}';
                       return Column(
                         children: [
                           if (index > 0) const Divider(color: Colors.white10, height: 24),
                           _DeviceRow(
                             name: name,
-                            platform: platform,
-                            icon: index % 2 == 0 ? Icons.phone_android_rounded : Icons.laptop_windows_rounded,
-                            color: index % 2 == 0 ? AirBridgeColors.masterAccent : const Color(0xFF40C4FF),
-                            bytesUsed: '${(1.2 * (index + 1)).toStringAsFixed(1)} GB',
-                            latency: '${6 + (index * 3)}ms',
+                            platform: 'Active Client',
+                            icon: Icons.devices_rounded,
+                            color: AirBridgeColors.masterAccent,
+                            bytesUsed: 'Data secured',
+                            latency: 'Real-time',
                           ),
                         ],
                       );

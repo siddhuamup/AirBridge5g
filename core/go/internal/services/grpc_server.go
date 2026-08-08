@@ -215,6 +215,7 @@ func (s *GRPCServer) GetTrafficStats(ctx context.Context, req *controlv1.GetTraf
 	}, nil
 }
 
+
 // StreamTrafficStats streams real-time traffic statistics updates every 500ms.
 func (s *GRPCServer) StreamTrafficStats(req *controlv1.StreamTrafficStatsRequest, stream controlv1.ControlPlane_StreamTrafficStatsServer) error {
 	intervalMs := req.IntervalMs

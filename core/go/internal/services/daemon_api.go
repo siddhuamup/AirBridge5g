@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/example/securemesh/core/internal/mesh"
 )
 
 // SetRoleConvenience sets the node role without explicit context requirement.
@@ -30,7 +32,23 @@ func (d *Daemon) ImportQRCredentials(payload string) error {
 		return fmt.Errorf("QR credentials expired at %d", creds.ExpiresAt)
 	}
 
-	log.Printf("[airbridge-daemon] successfully imported QR credentials for peer node %s", creds.NodeID)
+	d.mu.RLock()
+	meshSvc := d.meshService
+	d.mu.RUnlock()
+
+	if meshSvc != nil {
+		peerID := creds.NodeID // or parse from QR
+		peerAddr := fmt.Sprintf("%s:%d", creds.ProxyHost, creds.QUICPort) // Assuming QUIC port is mesh port
+		peerInfo := mesh.PeerInfo{
+			ID:    peerID,
+			Addrs: []string{peerAddr},
+		}
+		if err := meshSvc.Connect(context.Background(), peerInfo); err != nil {
+			return fmt.Errorf("mesh connect: %w", err)
+		}
+	}
+
+	log.Printf("[airbridge-daemon] successfully imported QR credentials and connected to peer %s", creds.NodeID)
 	return nil
 }
 

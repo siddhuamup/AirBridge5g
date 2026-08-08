@@ -211,12 +211,14 @@ func (d *Daemon) StartedAt() time.Time {
 // UpdateDaemonConfig updates the active configuration live at runtime.
 func (d *Daemon) UpdateDaemonConfig(newCfg DaemonConfig) {
 	d.mu.Lock()
-	defer d.mu.Unlock()
+	
+	restartProxy := false
 	if newCfg.NodeID != "" {
 		d.cfg.NodeID = newCfg.NodeID
 	}
-	if newCfg.ProxyAddress != "" {
+	if newCfg.ProxyAddress != "" && d.cfg.ProxyAddress != newCfg.ProxyAddress {
 		d.cfg.ProxyAddress = newCfg.ProxyAddress
+		restartProxy = true
 	}
 	if newCfg.GRPCAddress != "" {
 		d.cfg.GRPCAddress = newCfg.GRPCAddress
@@ -224,6 +226,35 @@ func (d *Daemon) UpdateDaemonConfig(newCfg DaemonConfig) {
 	if newCfg.QUICPort > 0 {
 		d.cfg.QUICPort = newCfg.QUICPort
 	}
+	
+	oldProxy := d.proxyServer
+	d.mu.Unlock()
+	
+	if restartProxy && oldProxy != nil {
+		log.Printf("[airbridge-daemon] hot-reloading proxy server to %s", newCfg.ProxyAddress)
+		// Shutdown the old proxy in the background and let a new instance be created on next tunnel start.
+		// For a full fix, we would reinitialize the proxy and start it here.
+		_ = oldProxy.Shutdown(context.Background())
+		
+		d.mu.Lock()
+		d.proxyServer = proxy.NewServer(proxy.ServerConfig{
+			BindAddress:    d.cfg.ProxyAddress,
+			MaxConnections: 1000,
+			DialTimeout:    10 * time.Second,
+			RelayBufSize:   32768,
+		})
+		d.mu.Unlock()
+		
+		// If tunnel is running, restart it
+		if d.TunnelState() == TunnelRunning {
+			// Restart in background
+			go func() {
+				_ = d.StopTunnel(context.Background())
+				_ = d.StartTunnel(context.Background())
+			}()
+		}
+	}
+	
 	log.Printf("[airbridge-daemon] live config updated (nodeID=%s, proxyAddr=%s, grpcAddr=%s)",
 		d.cfg.NodeID, d.cfg.ProxyAddress, d.cfg.GRPCAddress)
 }
@@ -562,6 +593,8 @@ func extractPort(address string) int {
 
 // PrivacyConfig contains runtime toggle settings for the privacy engine.
 type PrivacyConfig struct {
+	DoHEnabled         bool `json:"doh_enabled"`
+	KillSwitchEnabled  bool `json:"kill_switch_enabled"`
 	TTLEnabled         bool `json:"ttl_enabled"`
 	FragmenterEnabled  bool `json:"fragmenter_enabled"`
 	UAHarmonizeEnabled bool `json:"ua_harmonize_enabled"`
@@ -572,6 +605,8 @@ func (d *Daemon) GetPrivacyConfig() PrivacyConfig {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return PrivacyConfig{
+		DoHEnabled:         d.proxyServer != nil && d.proxyServer.GetConfig().DoHEnabled,
+		KillSwitchEnabled:  d.proxyServer != nil && d.proxyServer.GetConfig().KillSwitchEnabled,
 		TTLEnabled:         d.ttlNormalizer != nil && d.ttlNormalizer.IsEnabled(),
 		FragmenterEnabled:  d.fragmenter != nil && d.fragmenter.IsEnabled(),
 		UAHarmonizeEnabled: d.uaHarmonizer != nil && d.uaHarmonizer.IsEnabled(),
@@ -591,6 +626,9 @@ func (d *Daemon) SetPrivacyConfig(cfg PrivacyConfig) {
 	if d.uaHarmonizer != nil {
 		d.uaHarmonizer.SetEnabled(cfg.UAHarmonizeEnabled)
 	}
-	log.Printf("[airbridge-daemon] privacy config updated: TTL=%v Frag=%v UA=%v",
-		cfg.TTLEnabled, cfg.FragmenterEnabled, cfg.UAHarmonizeEnabled)
+	if d.proxyServer != nil {
+		d.proxyServer.UpdatePrivacyConfig(cfg.DoHEnabled, cfg.KillSwitchEnabled)
+	}
+	log.Printf("[airbridge-daemon] privacy config updated: DoH=%v KillSwitch=%v TTL=%v Frag=%v UA=%v",
+		cfg.DoHEnabled, cfg.KillSwitchEnabled, cfg.TTLEnabled, cfg.FragmenterEnabled, cfg.UAHarmonizeEnabled)
 }

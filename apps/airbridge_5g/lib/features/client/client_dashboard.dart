@@ -703,12 +703,6 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
           _DetailRow(label: 'Master Node', value: _masterNodeName),
           const Divider(height: 20),
           _DetailRow(label: 'Proxy', value: proxyVal),
-          const Divider(height: 20),
-          _DetailRow(label: 'Protocol', value: 'SOCKS5 / TLS 1.3'),
-          const Divider(height: 20),
-          _DetailRow(label: 'Latency', value: '${_measuredLatencyMs}ms'),
-          const Divider(height: 20),
-          _DetailRow(label: 'TTL Normalized', value: '64 (Mobile OS)'),
         ],
       ),
     );

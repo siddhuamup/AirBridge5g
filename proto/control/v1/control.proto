@@ -30,6 +30,7 @@ service ControlPlane {
 
   // Privacy engine statistics
   rpc GetPrivacyStats(GetPrivacyStatsRequest) returns (GetPrivacyStatsResponse);
+  rpc SetPrivacyConfig(SetPrivacyConfigRequest) returns (SetPrivacyConfigResponse);
 }
 
 // === Enums ===
@@ -202,6 +203,18 @@ message GetPrivacyStatsResponse {
   TTLNormalizationStats ttl = 1;
   FragmentationStats fragmentation = 2;
   UserAgentStats user_agent = 3;
+}
+
+message SetPrivacyConfigRequest {
+  bool doh_enabled = 1;
+  bool kill_switch_enabled = 2;
+  bool ttl_enabled = 3;
+  bool fragmenter_enabled = 4;
+  bool ua_harmonize_enabled = 5;
+}
+
+message SetPrivacyConfigResponse {
+  bool success = 1;
 }
 
 message TTLNormalizationStats {
