@@ -415,8 +415,10 @@ func (s *Server) authenticatePassword(conn net.Conn) error {
 		return ErrAuthFailed
 	}
 
-	_, err := conn.Write([]byte{0x01, 0x00}) // auth success
-	return err
+	if _, err := conn.Write([]byte{0x01, 0x00}); err != nil {
+		return fmt.Errorf("write auth success response: %w", err)
+	}
+	return nil
 }
 
 // readRequest reads and parses the SOCKS5 CONNECT request.
@@ -615,8 +617,28 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 		if s.cfg.UAHarmonizer != nil {
 			srcReader = &uaHarmonizingReader{r: client, uaHarmonizer: s.cfg.UAHarmonizer}
 		}
-		n, _ := io.CopyBuffer(dstWriter, srcReader, make([]byte, s.cfg.RelayBufSize))
-		s.metrics.BytesIn.Add(n)
+		
+		buf := make([]byte, s.cfg.RelayBufSize)
+		var total int64
+		for {
+			nr, err := srcReader.Read(buf)
+			if nr > 0 {
+				nw, ew := dstWriter.Write(buf[:nr])
+				if nw > 0 {
+					total += int64(nw)
+				}
+				if ew != nil {
+					break
+				}
+				if nr != nw {
+					break
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+		s.metrics.BytesIn.Add(total)
 	}()
 
 	// target → client
@@ -629,8 +651,28 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 			cancel()
 			closeSockets()
 		}()
-		n, _ := io.CopyBuffer(client, target, make([]byte, s.cfg.RelayBufSize))
-		s.metrics.BytesOut.Add(n)
+		
+		buf := make([]byte, s.cfg.RelayBufSize)
+		var total int64
+		for {
+			nr, err := target.Read(buf)
+			if nr > 0 {
+				nw, ew := client.Write(buf[:nr])
+				if nw > 0 {
+					total += int64(nw)
+				}
+				if ew != nil {
+					break
+				}
+				if nr != nw {
+					break
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+		s.metrics.BytesOut.Add(total)
 	}()
 
 	// Context cancellation watchdog

@@ -15,6 +15,14 @@ import (
 	"time"
 )
 
+// GossipMessage represents a peer discovery message sent over UDP.
+type GossipMessage struct {
+	Version   int      `json:"version"`
+	NodeID    string   `json:"node_id"`
+	KnownPeers []string `json:"known_peers"`
+	Timestamp int64    `json:"timestamp"`
+}
+
 // Discovery transport types.
 const (
 	DiscoveryMDNS      = "mdns"      // LAN peer discovery
@@ -98,11 +106,12 @@ type LibP2PService struct {
 	subMu       sync.RWMutex
 
 	// Lifecycle
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
-	mu      sync.Mutex
-	started bool
+	ctx      context.Context
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
+	mu       sync.Mutex
+	started  bool
+	udpConn  *net.UDPConn
 }
 
 type connectedPeer struct {
@@ -181,6 +190,10 @@ func (s *LibP2PService) Start(ctx context.Context) error {
 		go s.bootstrapLoop()
 	}
 
+	// Start UDP Gossip Listener
+	s.wg.Add(1)
+	go s.gossipListenerLoop()
+
 	// Start GossipSub-like peer discovery exchange
 	s.wg.Add(1)
 	go s.gossipLoop()
@@ -211,6 +224,10 @@ func (s *LibP2PService) Stop(ctx context.Context) error {
 	case <-done:
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+
+	if s.udpConn != nil {
+		_ = s.udpConn.Close()
 	}
 
 	// Close all active peer connections
@@ -483,7 +500,13 @@ func (s *LibP2PService) gossipLoop() {
 			s.peersMu.RUnlock()
 
 			if len(knownAddrs) > 0 {
-				payload, _ := json.Marshal(knownAddrs)
+				msg := GossipMessage{
+					Version:    1,
+					NodeID:     s.nodeID,
+					KnownPeers: knownAddrs,
+					Timestamp:  time.Now().UnixMilli(),
+				}
+				payload, _ := json.Marshal(msg)
 				for _, addr := range knownAddrs {
 					// Actual network transmission
 					conn, err := net.DialTimeout("udp", addr, 2*time.Second)
@@ -494,6 +517,92 @@ func (s *LibP2PService) gossipLoop() {
 				}
 				s.stats.MessagesRelayed.Add(1)
 				s.stats.BytesRelayed.Add(int64(len(payload) * len(knownAddrs)))
+			}
+		}
+	}
+}
+
+// gossipListenerLoop listens for UDP gossip messages.
+func (s *LibP2PService) gossipListenerLoop() {
+	defer s.wg.Done()
+
+	if len(s.cfg.ListenAddrs) == 0 {
+		return
+	}
+	
+	// Since this is an emulation, we will just start a UDP listener on 0.0.0.0:0
+	// In a real libp2p, the multiaddr would be used.
+	
+	addr, err := net.ResolveUDPAddr("udp", ":0") // bind to any available port
+	if err != nil {
+		log.Printf("[airbridge-mesh] gossip listener address resolution failed: %v", err)
+		return
+	}
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		log.Printf("[airbridge-mesh] gossip listener failed to bind: %v", err)
+		return
+	}
+	s.udpConn = conn
+	
+	log.Printf("[airbridge-mesh] gossip listener bound to %v", conn.LocalAddr())
+
+	buf := make([]byte, 4096)
+	for {
+		if s.ctx.Err() != nil {
+			return
+		}
+		
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		n, _, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue
+			}
+			if s.ctx.Err() == nil {
+				log.Printf("[airbridge-mesh] gossip read error: %v", err)
+			}
+			continue
+		}
+
+		var msg GossipMessage
+		if err := json.Unmarshal(buf[:n], &msg); err != nil {
+			continue // ignore invalid messages
+		}
+
+		if msg.NodeID == s.nodeID {
+			continue // ignore our own messages
+		}
+
+		s.stats.MessagesRelayed.Add(1)
+		s.stats.BytesRelayed.Add(int64(n))
+		
+		s.UpdatePeerLastSeen(msg.NodeID)
+
+		// Discover new peers
+		for _, pAddr := range msg.KnownPeers {
+			// Basic protection against self-connect loop
+			s.peersMu.RLock()
+			found := false
+			for _, cp := range s.peers {
+				for _, a := range cp.info.Addrs {
+					if a == pAddr {
+						found = true
+						break
+					}
+				}
+			}
+			s.peersMu.RUnlock()
+
+			if !found {
+				// Fire a peer discovered event
+				s.emitEvent("", DiscoveryEvent{
+					Peer: PeerInfo{
+						ID:    fmt.Sprintf("discovered-%s", pAddr),
+						Addrs: []string{pAddr},
+					},
+				})
 			}
 		}
 	}
