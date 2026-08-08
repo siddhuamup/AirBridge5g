@@ -264,18 +264,24 @@ class _RoleCardState extends State<_RoleCard>
         setState(() => _isHovered = false);
         _hoverController.reverse();
       },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedBuilder(
-          animation: _hoverController,
-          builder: (context, child) {
-            final scale = 1.0 + (_hoverController.value * 0.02);
-            final glowSpread = _hoverController.value * 20;
+      child: AnimatedBuilder(
+        animation: _hoverController,
+        builder: (context, child) {
+          final scale = 1.0 + (_hoverController.value * 0.02);
+          final glowSpread = _hoverController.value * 20;
 
-            return Transform.scale(
-              scale: scale,
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 180),
+          return Transform.scale(
+            scale: scale,
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(20),
+                splashColor: widget.accentColor.withValues(alpha: 0.2),
+                highlightColor: widget.accentColor.withValues(alpha: 0.1),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 180),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: LinearGradient(
@@ -355,9 +361,9 @@ class _RoleCardState extends State<_RoleCard>
                   ),
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }

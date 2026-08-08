@@ -14,6 +14,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/example/securemesh/core/internal/privacy"
 )
 
 // SOCKS5 protocol constants (RFC 1928).
@@ -124,6 +126,8 @@ type ServerConfig struct {
 	MaxConnections int
 	DialTimeout    time.Duration
 	RelayBufSize   int
+	Fragmenter     *privacy.Fragmenter
+	UAHarmonizer   *privacy.UAHarmonizer
 }
 
 // DefaultServerConfig returns sensible defaults.
@@ -306,7 +310,7 @@ func (s *Server) negotiate(conn net.Conn) error {
 			}
 		}
 		if !hasPasswordAuth {
-			conn.Write([]byte{socks5Version, socks5AuthNoAccept})
+			_, _ = conn.Write([]byte{socks5Version, socks5AuthNoAccept})
 			return ErrAuthFailed
 		}
 
@@ -351,7 +355,7 @@ func (s *Server) authenticatePassword(conn net.Conn) error {
 
 	if !s.cfg.Auth.Validate(string(uname), string(passwd)) {
 		s.metrics.AuthFailures.Add(1)
-		conn.Write([]byte{0x01, 0x01}) // auth failure
+		_, _ = conn.Write([]byte{0x01, 0x01}) // auth failure
 		return ErrAuthFailed
 	}
 
@@ -417,7 +421,7 @@ func (s *Server) readRequest(conn net.Conn) (string, error) {
 }
 
 // sendReply sends a SOCKS5 reply to the client.
-func (s *Server) sendReply(conn net.Conn, status byte, bindIP string, bindPort int) {
+func (s *Server) sendReply(conn net.Conn, status byte, bindIP string, bindPort int) error {
 	ip := net.ParseIP(bindIP)
 	if ip == nil {
 		ip = net.IPv4zero
@@ -448,7 +452,32 @@ func (s *Server) sendReply(conn net.Conn, status byte, bindIP string, bindPort i
 		reply[20] = byte(bindPort >> 8)
 		reply[21] = byte(bindPort & 0xFF)
 	}
-	conn.Write(reply)
+	_, err := conn.Write(reply)
+	return err
+}
+
+type fragmentingWriter struct {
+	w          io.Writer
+	fragmenter *privacy.Fragmenter
+}
+
+func (fw *fragmentingWriter) Write(p []byte) (n int, err error) {
+	if fw.fragmenter == nil || !fw.fragmenter.IsEnabled() {
+		return fw.w.Write(p)
+	}
+	frags, err := fw.fragmenter.Fragment(p)
+	if err != nil || len(frags) == 0 {
+		return fw.w.Write(p)
+	}
+	total := 0
+	for _, frag := range frags {
+		nw, err := fw.w.Write(frag)
+		total += nw
+		if err != nil {
+			return total, err
+		}
+	}
+	return total, nil
 }
 
 // relay copies data bidirectionally between client and target.
@@ -456,28 +485,45 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	var once sync.Once
 	closeSockets := func() {
-		_ = client.SetDeadline(time.Now())
-		_ = target.SetDeadline(time.Now())
+		once.Do(func() {
+			_ = client.SetDeadline(time.Now())
+			_ = target.SetDeadline(time.Now())
+		})
 	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	// client → target
+	// client → target (with packet fragmentation if enabled)
 	go func() {
-		defer wg.Done()
-		defer cancel()
-		defer closeSockets()
-		n, _ := io.CopyBuffer(target, client, make([]byte, s.cfg.RelayBufSize))
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[airbridge-proxy] panic recovered in client->target relay: %v", r)
+			}
+			wg.Done()
+			cancel()
+			closeSockets()
+		}()
+		dstWriter := io.Writer(target)
+		if s.cfg.Fragmenter != nil {
+			dstWriter = &fragmentingWriter{w: target, fragmenter: s.cfg.Fragmenter}
+		}
+		n, _ := io.CopyBuffer(dstWriter, client, make([]byte, s.cfg.RelayBufSize))
 		s.metrics.BytesIn.Add(n)
 	}()
 
 	// target → client
 	go func() {
-		defer wg.Done()
-		defer cancel()
-		defer closeSockets()
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[airbridge-proxy] panic recovered in target->client relay: %v", r)
+			}
+			wg.Done()
+			cancel()
+			closeSockets()
+		}()
 		n, _ := io.CopyBuffer(client, target, make([]byte, s.cfg.RelayBufSize))
 		s.metrics.BytesOut.Add(n)
 	}()

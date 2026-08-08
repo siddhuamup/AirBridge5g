@@ -169,9 +169,9 @@ func (s *LibP2PService) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go s.peerHealthLoop()
 
-	// Start mDNS local peer discovery loop
+	// Start active peer metrics loop
 	s.wg.Add(1)
-	go s.mdnsDiscoveryLoop()
+	go s.peerCountMetricsLoop()
 
 	// Connect to bootstrap peers
 	if len(s.cfg.Bootstrap) > 0 {
@@ -418,8 +418,8 @@ func (s *LibP2PService) UpdatePeerLastSeen(peerID string) {
 	}
 }
 
-// mdnsDiscoveryLoop runs LAN peer discovery periodically.
-func (s *LibP2PService) mdnsDiscoveryLoop() {
+// peerCountMetricsLoop monitors active peer metrics periodically.
+func (s *LibP2PService) peerCountMetricsLoop() {
 	defer s.wg.Done()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()

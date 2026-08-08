@@ -59,6 +59,11 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
     try {
       final creds = await client.generateQRCredentials();
       final peers = await client.getConnectedPeers();
+      final status = await client.getStatus();
+      if (status.startedAtUnixMs > 0) {
+        ref.read(sessionStartTimeProvider.notifier).state =
+            DateTime.fromMillisecondsSinceEpoch(status.startedAtUnixMs);
+      }
       if (mounted) {
         setState(() {
           _qrCredentials = creds;
@@ -72,6 +77,17 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         );
       }
     }
+  }
+
+  Future<void> _syncDaemonPrivacyConfig() async {
+    try {
+      final daemonClient = ref.read(daemonProvider);
+      await daemonClient.setPrivacyConfig(
+        ttlEnabled: _ttlEnabled,
+        fragmenterEnabled: _fragEnabled,
+        uaHarmonizeEnabled: _uaEnabled,
+      );
+    } catch (_) {}
   }
 
   @override
@@ -533,21 +549,30 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
             title: 'TTL Normalization',
             subtitle: 'Masks packet TTL to 64 (Mobile OS appearance)',
             value: _ttlEnabled,
-            onChanged: (val) => setState(() => _ttlEnabled = val),
+            onChanged: (val) {
+              setState(() => _ttlEnabled = val);
+              _syncDaemonPrivacyConfig();
+            },
           ),
           const Divider(color: Colors.white10, height: 20),
           _PrivacySwitch(
             title: 'Packet Fragmentation',
             subtitle: 'Splits TLS records to prevent DPI identification',
             value: _fragEnabled,
-            onChanged: (val) => setState(() => _fragEnabled = val),
+            onChanged: (val) {
+              setState(() => _fragEnabled = val);
+              _syncDaemonPrivacyConfig();
+            },
           ),
           const Divider(color: Colors.white10, height: 20),
           _PrivacySwitch(
             title: 'User-Agent Harmonization',
             subtitle: 'Harmonizes HTTP headers to mobile Chrome',
             value: _uaEnabled,
-            onChanged: (val) => setState(() => _uaEnabled = val),
+            onChanged: (val) {
+              setState(() => _uaEnabled = val);
+              _syncDaemonPrivacyConfig();
+            },
           ),
         ],
       ),

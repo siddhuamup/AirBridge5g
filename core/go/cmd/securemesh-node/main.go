@@ -138,6 +138,8 @@ func main() {
 	proxyCfg := proxy.DefaultServerConfig()
 	// Dynamic token authenticator — populated via QR credential exchange at runtime
 	proxyCfg.Auth = proxy.NewTokenAuthenticator(make(map[string]string))
+	proxyCfg.Fragmenter = fragmenter
+	proxyCfg.UAHarmonizer = uaHarmonizer
 	proxyServer := proxy.NewServer(proxyCfg)
 
 	// === Mesh Network ===
@@ -157,6 +159,7 @@ func main() {
 		fragmenter,
 		uaHarmonizer,
 		state,
+		killSwitch,
 	)
 
 	if err := daemon.Start(ctx); err != nil {

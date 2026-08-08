@@ -23,7 +23,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   late final AnimationController _entryController;
   late final AnimationController _scanLineController;
   final MobileScannerController _scannerController = MobileScannerController();
-  final TextEditingController _manualProxyController = TextEditingController(text: '127.0.0.1:1080');
+  final TextEditingController _manualProxyController = TextEditingController();
   bool _isConnected = false;
   bool _isScanning = false;
   bool _isConnecting = false;
@@ -100,11 +100,46 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   }
 
   Future<void> _connectManually() async {
-    final input = _manualProxyController.text.trim();
-    if (input.isEmpty) return;
-    final parts = input.split(':');
-    final host = parts[0];
-    final port = parts.length > 1 ? int.tryParse(parts[1]) ?? 1080 : 1080;
+    var rawInput = _manualProxyController.text.trim();
+    if (rawInput.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a proxy address (e.g. 192.168.1.100:1080)')),
+      );
+      return;
+    }
+
+    if (rawInput.contains('://')) {
+      rawInput = rawInput.split('://').last;
+    }
+
+    String host;
+    int port = 1080;
+
+    if (rawInput.startsWith('[')) {
+      final closingBracket = rawInput.indexOf(']');
+      if (closingBracket != -1) {
+        host = rawInput.substring(1, closingBracket);
+        final remainder = rawInput.substring(closingBracket + 1);
+        if (remainder.startsWith(':')) {
+          port = int.tryParse(remainder.substring(1)) ?? 1080;
+        }
+      } else {
+        host = rawInput;
+      }
+    } else {
+      final parts = rawInput.split(':');
+      host = parts[0];
+      if (parts.length > 1) {
+        port = int.tryParse(parts[1]) ?? 1080;
+      }
+    }
+
+    if (host.isEmpty || port <= 0 || port > 65535) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid proxy host or port range (1-65535)')),
+      );
+      return;
+    }
 
     HapticFeedback.lightImpact();
     setState(() => _isConnecting = true);

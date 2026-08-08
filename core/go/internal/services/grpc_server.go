@@ -77,14 +77,15 @@ func (s *GRPCServer) GetStatus(ctx context.Context, req *controlv1.GetStatusRequ
 		return nil, status.Errorf(codes.Internal, "get status: %v", err)
 	}
 
-	uptime := int64(time.Since(s.daemon.startedAt).Seconds())
+	startedAt := s.daemon.StartedAt()
+	uptime := int64(time.Since(startedAt).Seconds())
 
 	return &controlv1.GetStatusResponse{
 		NodeId:          nodeStatus.NodeID,
 		TunnelState:     mapTunnelState(nodeStatus.TunnelState),
 		Role:            mapNodeRole(s.daemon.GetRole()),
 		ConnectedPeers:  uint32(nodeStatus.ConnectedPeer),
-		StartedAtUnixMs: s.daemon.startedAt.UnixMilli(),
+		StartedAtUnixMs: startedAt.UnixMilli(),
 		UptimeSeconds:   uptime,
 		Version:         s.daemon.cfg.Version,
 		Platform:        runtime.GOOS,
@@ -103,7 +104,7 @@ func (s *GRPCServer) StartTunnel(ctx context.Context, req *controlv1.StartTunnel
 	}
 
 	return &controlv1.StartTunnelResponse{
-		State:        mapTunnelState(s.daemon.tunnelState),
+		State:        mapTunnelState(s.daemon.TunnelState()),
 		ProxyAddress: s.daemon.cfg.ProxyAddress,
 		QuicPort:     uint32(s.daemon.cfg.QUICPort),
 	}, nil

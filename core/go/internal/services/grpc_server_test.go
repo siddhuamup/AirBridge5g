@@ -10,7 +10,7 @@ import (
 
 func TestGRPCServer_GetStatus(t *testing.T) {
 	cfg := DefaultDaemonConfig()
-	daemon := NewDaemon(cfg, nil, nil, nil, nil, nil, nil)
+	daemon := NewDaemon(cfg, nil, nil, nil, nil, nil, nil, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -41,7 +41,7 @@ func TestGRPCServer_GetStatus(t *testing.T) {
 
 func TestGRPCServer_SetAndGetRole(t *testing.T) {
 	cfg := DefaultDaemonConfig()
-	daemon := NewDaemon(cfg, nil, nil, nil, nil, nil, nil)
+	daemon := NewDaemon(cfg, nil, nil, nil, nil, nil, nil, nil)
 	server := NewGRPCServer(daemon, "127.0.0.1:0")
 
 	ctx := context.Background()
@@ -69,7 +69,7 @@ func TestGRPCServer_SetAndGetRole(t *testing.T) {
 
 func TestGRPCServer_GenerateAndImportQR(t *testing.T) {
 	cfg := DefaultDaemonConfig()
-	daemon := NewDaemon(cfg, nil, nil, nil, nil, nil, nil)
+	daemon := NewDaemon(cfg, nil, nil, nil, nil, nil, nil, nil)
 	server := NewGRPCServer(daemon, "127.0.0.1:0")
 
 	ctx := context.Background()

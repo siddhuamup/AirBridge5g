@@ -9,12 +9,15 @@ import (
 	"log"
 	"net"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/example/securemesh/core/internal/mesh"
 	"github.com/example/securemesh/core/internal/privacy"
 	"github.com/example/securemesh/core/internal/proxy"
+	"github.com/example/securemesh/core/internal/security"
 	"github.com/example/securemesh/core/internal/storage"
 )
 
@@ -105,6 +108,7 @@ type Daemon struct {
 	fragmenter     *privacy.Fragmenter
 	uaHarmonizer   *privacy.UAHarmonizer
 	stateStore     storage.StateStore
+	killSwitch     *security.KillSwitch
 
 	// Traffic history for UI graphs
 	trafficHistory []TrafficSnapshot
@@ -126,6 +130,7 @@ func NewDaemon(
 	fragmenter *privacy.Fragmenter,
 	uaHarmonizer *privacy.UAHarmonizer,
 	stateStore storage.StateStore,
+	killSwitch *security.KillSwitch,
 ) *Daemon {
 	return &Daemon{
 		cfg:            cfg,
@@ -137,6 +142,7 @@ func NewDaemon(
 		fragmenter:     fragmenter,
 		uaHarmonizer:   uaHarmonizer,
 		stateStore:     stateStore,
+		killSwitch:     killSwitch,
 		trafficHistory: make([]TrafficSnapshot, 0, 120),
 		maxHistory:     120, // 60 seconds at 500ms intervals
 	}
@@ -166,29 +172,47 @@ func (d *Daemon) Start(ctx context.Context) error {
 // Stop gracefully shuts down all daemon sub-systems.
 func (d *Daemon) Stop(ctx context.Context) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	if d.cancel != nil {
 		d.cancel()
 	}
+	proxy := d.proxyServer
+	mesh := d.meshService
+	d.mu.Unlock()
 
-	// Stop proxy
-	if d.proxyServer != nil {
-		if err := d.proxyServer.Shutdown(ctx); err != nil {
+	// Stop proxy without holding lock
+	if proxy != nil {
+		if err := proxy.Shutdown(ctx); err != nil {
 			log.Printf("[airbridge-daemon] proxy shutdown: %v", err)
 		}
 	}
 
-	// Stop mesh
-	if d.meshService != nil {
-		if err := d.meshService.Stop(ctx); err != nil {
+	// Stop mesh without holding lock
+	if mesh != nil {
+		if err := mesh.Stop(ctx); err != nil {
 			log.Printf("[airbridge-daemon] mesh shutdown: %v", err)
 		}
 	}
 
+	d.mu.Lock()
 	d.tunnelState = TunnelStopped
+	d.mu.Unlock()
+
 	log.Printf("[airbridge-daemon] stopped")
 	return nil
+}
+
+// StartedAt returns the daemon start time safely.
+func (d *Daemon) StartedAt() time.Time {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.startedAt
+}
+
+// TunnelState returns the current tunnel state safely.
+func (d *Daemon) TunnelState() TunnelState {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.tunnelState
 }
 
 // SetRole changes the node's role (Master/Client).
@@ -262,6 +286,13 @@ func (d *Daemon) StartTunnel(ctx context.Context) error {
 		}
 	}
 
+	// Arm Kill Switch if available
+	if d.killSwitch != nil {
+		if err := d.killSwitch.Enable(); err != nil {
+			log.Printf("[airbridge-daemon] kill switch enable warning: %v", err)
+		}
+	}
+
 	d.tunnelState = TunnelRunning
 	log.Printf("[airbridge-daemon] tunnel started (role=%s)", d.role)
 	return nil
@@ -271,6 +302,10 @@ func (d *Daemon) StartTunnel(ctx context.Context) error {
 func (d *Daemon) StopTunnel(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
+	if d.killSwitch != nil {
+		_ = d.killSwitch.Disable()
+	}
 
 	if d.proxyServer != nil {
 		if err := d.proxyServer.Shutdown(ctx); err != nil {
@@ -442,17 +477,52 @@ func (d *Daemon) currentTrafficSnapshot() TrafficSnapshot {
 
 // detectLocalIP finds the device's local network IP.
 func detectLocalIP() string {
-	addrs, err := net.InterfaceAddrs()
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		return "127.0.0.1"
 	}
 
-	for _, addr := range addrs {
-		if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
-			if ipNet.IP.To4() != nil {
-				return ipNet.IP.String()
+	isVirtual := func(name string) bool {
+		nameLower := strings.ToLower(name)
+		for _, prefix := range []string{"docker", "vbox", "veth", "wsl", "br-", "tun", "tap", "vnic", "vmnet"} {
+			if strings.Contains(nameLower, prefix) {
+				return true
 			}
 		}
+		return false
+	}
+
+	var fallback string
+	for _, iface := range ifaces {
+		if (iface.Flags&net.FlagUp) == 0 || (iface.Flags&net.FlagLoopback) != 0 {
+			continue
+		}
+		if isVirtual(iface.Name) {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
+				if ip4 := ipNet.IP.To4(); ip4 != nil {
+					nameLower := strings.ToLower(iface.Name)
+					if strings.Contains(nameLower, "wlan") || strings.Contains(nameLower, "wifi") || strings.Contains(nameLower, "eth") || strings.Contains(nameLower, "en") {
+						return ip4.String()
+					}
+					if fallback == "" {
+						fallback = ip4.String()
+					}
+				}
+			}
+		}
+	}
+
+	if fallback != "" {
+		return fallback
 	}
 	return "127.0.0.1"
 }
@@ -463,8 +533,10 @@ func extractPort(address string) int {
 	if err != nil {
 		return 1080
 	}
-	port := 1080
-	fmt.Sscanf(portStr, "%d", &port)
+	port, err := strconv.Atoi(portStr)
+	if err != nil || port <= 0 || port > 65535 {
+		return 1080
+	}
 	return port
 }
 

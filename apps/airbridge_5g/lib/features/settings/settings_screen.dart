@@ -2,13 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app.dart';
 import '../../providers/role_provider.dart';
+import '../../providers/daemon_provider.dart';
 
 /// Settings screen — accessible from both Master and Client modes.
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _dohEnabled = true;
+  bool _killSwitchEnabled = true;
+  bool _ttlEnabled = true;
+  bool _dpiEnabled = true;
+  bool _uaEnabled = true;
+
+  Future<void> _syncDaemonPrivacy() async {
+    try {
+      final daemonClient = ref.read(daemonProvider);
+      await daemonClient.setPrivacyConfig(
+        ttlEnabled: _ttlEnabled,
+        fragmenterEnabled: _dpiEnabled,
+        uaHarmonizeEnabled: _uaEnabled,
+      );
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final role = ref.watch(roleProvider);
     final isMaster = role == NodeRole.master;
     final bgColor = isMaster ? AirBridgeColors.masterPrimary : AirBridgeColors.clientSurface;
@@ -50,8 +73,8 @@ class SettingsScreen extends ConsumerWidget {
                 textColor: textColor,
                 accentColor: accentColor,
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
+                  value: _dohEnabled,
+                  onChanged: (val) => setState(() => _dohEnabled = val),
                   activeColor: accentColor,
                 ),
               ),
@@ -63,8 +86,8 @@ class SettingsScreen extends ConsumerWidget {
                 textColor: textColor,
                 accentColor: accentColor,
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
+                  value: _killSwitchEnabled,
+                  onChanged: (val) => setState(() => _killSwitchEnabled = val),
                   activeColor: accentColor,
                 ),
               ),
@@ -85,8 +108,11 @@ class SettingsScreen extends ConsumerWidget {
                 textColor: textColor,
                 accentColor: accentColor,
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
+                  value: _ttlEnabled,
+                  onChanged: (val) {
+                    setState(() => _ttlEnabled = val);
+                    _syncDaemonPrivacy();
+                  },
                   activeColor: accentColor,
                 ),
               ),
@@ -98,8 +124,11 @@ class SettingsScreen extends ConsumerWidget {
                 textColor: textColor,
                 accentColor: accentColor,
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
+                  value: _dpiEnabled,
+                  onChanged: (val) {
+                    setState(() => _dpiEnabled = val);
+                    _syncDaemonPrivacy();
+                  },
                   activeColor: accentColor,
                 ),
               ),
@@ -111,8 +140,11 @@ class SettingsScreen extends ConsumerWidget {
                 textColor: textColor,
                 accentColor: accentColor,
                 trailing: Switch(
-                  value: true,
-                  onChanged: (_) {},
+                  value: _uaEnabled,
+                  onChanged: (val) {
+                    setState(() => _uaEnabled = val);
+                    _syncDaemonPrivacy();
+                  },
                   activeColor: accentColor,
                 ),
               ),
