@@ -20,7 +20,7 @@ abstract class AirBridgeDaemonClient {
   Future<QRCredentials> generateQRCredentials();
   Future<bool> connectWithQR(String qrPayload);
   Stream<Map<String, dynamic>> streamTrafficStats();
-  Future<int> getConnectedPeers();
+  Future<List<Map<String, dynamic>>> getConnectedPeers();
   Future<DaemonStatus> getStatus();
   Future<bool> setPrivacyConfig({
     bool? dohEnabled,

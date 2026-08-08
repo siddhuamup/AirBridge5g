@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -482,9 +483,17 @@ func (s *LibP2PService) gossipLoop() {
 			s.peersMu.RUnlock()
 
 			if len(knownAddrs) > 0 {
-				// Simulating gossip sub message publishing
+				payload, _ := json.Marshal(knownAddrs)
+				for _, addr := range knownAddrs {
+					// Actual network transmission
+					conn, err := net.DialTimeout("udp", addr, 2*time.Second)
+					if err == nil {
+						conn.Write(payload)
+						conn.Close()
+					}
+				}
 				s.stats.MessagesRelayed.Add(1)
-				s.stats.BytesRelayed.Add(int64(len(knownAddrs) * 16))
+				s.stats.BytesRelayed.Add(int64(len(payload) * len(knownAddrs)))
 			}
 		}
 	}

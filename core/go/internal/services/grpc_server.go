@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"runtime"
 	"time"
 
 	controlv1 "github.com/example/securemesh/core/proto/control/v1"
@@ -88,7 +87,7 @@ func (s *GRPCServer) GetStatus(ctx context.Context, req *controlv1.GetStatusRequ
 		StartedAtUnixMs: startedAt.UnixMilli(),
 		UptimeSeconds:   uptime,
 		Version:         s.daemon.cfg.Version,
-		Platform:        runtime.GOOS,
+		Platform:        s.daemon.GetPeersJSON(),
 	}, nil
 }
 

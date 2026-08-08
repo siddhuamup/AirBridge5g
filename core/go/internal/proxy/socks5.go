@@ -300,11 +300,13 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	}
 
 	if dohEnabled {
-		// Route DNS queries over Cloudflare DoH / TLS
+		// Route DNS queries over Cloudflare DoT (DNS over TLS)
 		dialer.Resolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				return tls.Dial("tcp", "1.1.1.1:853", &tls.Config{})
+				return tls.Dial("tcp", "1.1.1.1:853", &tls.Config{
+					ServerName: "cloudflare-dns.com",
+				})
 			},
 		}
 	}
@@ -312,8 +314,8 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 	if s.cfg.TTLNormalizer != nil && s.cfg.TTLNormalizer.IsEnabled() {
 		dialer.Control = func(network, address string, c syscall.RawConn) error {
 			return c.Control(func(fd uintptr) {
-				// Set TTL to 64 for IPPROTO_IP on Windows
-				_ = syscall.SetsockoptInt(syscall.Handle(fd), syscall.IPPROTO_IP, syscall.IP_TTL, 64)
+				// Set TTL to 64 for IPPROTO_IP
+				_ = setTTL(fd, 64)
 			})
 		}
 	}

@@ -242,6 +242,9 @@ func (d *Daemon) UpdateDaemonConfig(newCfg DaemonConfig) {
 			MaxConnections: 1000,
 			DialTimeout:    10 * time.Second,
 			RelayBufSize:   32768,
+			TTLNormalizer:  d.ttlNormalizer,
+			Fragmenter:     d.fragmenter,
+			UAHarmonizer:   d.uaHarmonizer,
 		})
 		d.mu.Unlock()
 		

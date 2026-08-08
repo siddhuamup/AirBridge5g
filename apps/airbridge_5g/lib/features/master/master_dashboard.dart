@@ -26,7 +26,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
   StreamSubscription? _trafficSub;
   QRCredentials? _qrCredentials;
   DateTime _sessionStart = DateTime.now();
-  int _peerCount = 0;
+  List<Map<String, dynamic>> _peers = [];
   bool _ttlEnabled = true;
   bool _fragEnabled = true;
   bool _uaEnabled = true;
@@ -67,7 +67,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
       if (mounted) {
         setState(() {
           _qrCredentials = creds;
-          _peerCount = peers;
+          _peers = peers;
         });
         
         // Trigger QR entrance animation again to make regenerate button feel alive
@@ -233,7 +233,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         const SizedBox(width: 12),
         Expanded(child: _StatCard(
           label: 'PEERS',
-          value: '$_peerCount',
+          value: '${_peers.length}',
           icon: Icons.devices_rounded,
           color: const Color(0xFFFFAB40),
         )),
@@ -479,7 +479,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
               ),
               const Spacer(),
               Text(
-                '$_peerCount active',
+                '${_peers.length} active',
                 style: const TextStyle(
                   color: AirBridgeColors.masterAccent,
                   fontSize: 14,
@@ -491,7 +491,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
           const SizedBox(height: 16),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 400),
-            child: _peerCount == 0
+            child: _peers.isEmpty
                 ? Container(
                     key: const ValueKey(0),
                     padding: const EdgeInsets.symmetric(vertical: 24),
@@ -506,23 +506,34 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                     ),
                   )
                 : Column(
-                    key: ValueKey(_peerCount),
-                    children: List.generate(_peerCount, (index) {
-                      final name = 'Connected Peer #${index + 1}';
+                    key: ValueKey(_peers.length),
+                    children: _peers.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final peer = entry.value;
+                      final id = peer['ID']?.toString() ?? 'Unknown ID';
+                      final shortId = id.length > 8 ? id.substring(0, 8) : id;
+                      final name = 'Peer $shortId';
+                      
+                      final platformRaw = peer['Platform']?.toString() ?? 'unknown';
+                      final platform = platformRaw.isNotEmpty ? platformRaw : 'Active Client';
+                      
+                      final latency = peer['Latency'] as num? ?? 0.0;
+                      final latencyStr = latency > 0 ? '${latency.toStringAsFixed(1)}ms' : 'Real-time';
+
                       return Column(
                         children: [
                           if (index > 0) const Divider(color: Colors.white10, height: 24),
                           _DeviceRow(
                             name: name,
-                            platform: 'Active Client',
+                            platform: platform,
                             icon: Icons.devices_rounded,
                             color: AirBridgeColors.masterAccent,
                             bytesUsed: 'Data secured',
-                            latency: 'Real-time',
+                            latency: latencyStr,
                           ),
                         ],
                       );
-                    }),
+                    }).toList(),
                   ),
           ),
         ],
