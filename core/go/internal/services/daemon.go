@@ -14,11 +14,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/example/securemesh/core/internal/handshake"
 	"github.com/example/securemesh/core/internal/mesh"
 	"github.com/example/securemesh/core/internal/privacy"
 	"github.com/example/securemesh/core/internal/proxy"
 	"github.com/example/securemesh/core/internal/security"
 	"github.com/example/securemesh/core/internal/storage"
+	"github.com/flynn/noise"
 )
 
 // NodeRole represents the device's role in the AirBridge mesh.
@@ -109,6 +111,7 @@ type Daemon struct {
 	uaHarmonizer  *privacy.UAHarmonizer
 	stateStore    storage.StateStore
 	killSwitch    *security.KillSwitch
+	noiseKeypair  noise.DHKey
 
 	// Traffic history for UI graphs
 	trafficHistory []TrafficSnapshot
@@ -132,6 +135,7 @@ func NewDaemon(
 	stateStore storage.StateStore,
 	killSwitch *security.KillSwitch,
 ) *Daemon {
+	kp, _ := handshake.GenerateStaticKeypair()
 	return &Daemon{
 		cfg:            cfg,
 		role:           RoleUnspecified,
@@ -143,9 +147,15 @@ func NewDaemon(
 		uaHarmonizer:   uaHarmonizer,
 		stateStore:     stateStore,
 		killSwitch:     killSwitch,
-		trafficHistory: make([]TrafficSnapshot, 0, 120),
-		maxHistory:     120, // 60 seconds at 500ms intervals
+		noiseKeypair:   kp,
+		trafficHistory: make([]TrafficSnapshot, 0, 60),
+		maxHistory:     60,
 	}
+}
+
+// UpgradeNoiseListener wraps a net.Listener with Noise XX encrypted handshakes.
+func (d *Daemon) UpgradeNoiseListener(l net.Listener) net.Listener {
+	return handshake.WrapListener(l, d.noiseKeypair, "ChaCha20-Poly1305")
 }
 
 // Start initializes the daemon and begins serving.

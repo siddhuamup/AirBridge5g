@@ -9,6 +9,8 @@ import 'providers/role_provider.dart';
 import 'providers/theme_provider.dart';
 import 'routing/app_router.dart';
 
+import 'providers/settings_provider.dart';
+
 /// Root application widget for AirBridge 5G.
 /// Dynamically switches between MaterialApp and CupertinoApp
 /// based on the target platform.
@@ -20,6 +22,8 @@ class AirBridgeApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
     final role = ref.watch(roleProvider);
+    final settings = ref.watch(settingsProvider);
+    final appLocale = Locale(settings.locale);
 
     if (!kIsWeb && Platform.isWindows) {
       final fluentAccent = role == NodeRole.master
@@ -28,6 +32,7 @@ class AirBridgeApp extends ConsumerWidget {
 
       return fluent.FluentApp.router(
         title: 'AirBridge 5G',
+        locale: appLocale,
         debugShowCheckedModeBanner: false,
         routerConfig: router,
         theme: fluent.FluentThemeData(
@@ -45,6 +50,7 @@ class AirBridgeApp extends ConsumerWidget {
     if (_isApplePlatform) {
       return CupertinoApp.router(
         title: 'AirBridge 5G',
+        locale: appLocale,
         debugShowCheckedModeBanner: false,
         routerConfig: router,
         theme: _cupertinoTheme(role),
@@ -53,6 +59,7 @@ class AirBridgeApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'AirBridge 5G',
+      locale: appLocale,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       themeMode: themeMode,

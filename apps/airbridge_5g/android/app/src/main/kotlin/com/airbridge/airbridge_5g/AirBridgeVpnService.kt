@@ -102,33 +102,50 @@ class AirBridgeVpnService : VpnService() {
     private fun forwardPackets() {
         val vpnFd = vpnInterface?.fileDescriptor ?: return
         val inputStream = ParcelFileDescriptor.AutoCloseInputStream(vpnInterface)
+        val outputStream = ParcelFileDescriptor.AutoCloseOutputStream(vpnInterface)
         val buffer = ByteArray(32767)
 
+        var relaySocket: Socket? = null
         try {
-            while (isRunning) {
+            val socket = Socket()
+            protect(socket) // Bypass TUN interface to avoid loop
+            socket.connect(InetSocketAddress(proxyHost, proxyPort), 5000)
+            
+            val out = socket.getOutputStream()
+            out.write(byteArrayOf(0x05, 0x01, 0x00)) // SOCKS5 initial handshake
+            out.flush()
+
+            relaySocket = socket
+
+            // Background thread to relay incoming socket data back to TUN outputStream
+            val socketIn = socket.getInputStream()
+            Thread {
+                val inBuf = ByteArray(32767)
+                try {
+                    while (isRunning && !socket.isClosed) {
+                        val len = socketIn.read(inBuf)
+                        if (len > 0) {
+                            outputStream.write(inBuf, 0, len)
+                            outputStream.flush()
+                        } else if (len < 0) break
+                    }
+                } catch (_: Exception) {}
+            }.start()
+
+            // Main loop to relay outgoing TUN inputStream data to SOCKS socket
+            while (isRunning && !socket.isClosed) {
                 val length = inputStream.read(buffer)
                 if (length > 0) {
-                    // Attempt SOCKS5 proxy relay socket connection for outgoing packets
-                    try {
-                        val socket = Socket()
-                        protect(socket) // Ensure socket bypasses TUN interface
-                        socket.connect(InetSocketAddress(proxyHost, proxyPort), 3000)
-                        
-                        val out = socket.getOutputStream()
-                        // SOCKS5 handshake (VER 5, 1 Method, NO AUTH)
-                        out.write(byteArrayOf(0x05, 0x01, 0x00))
-                        out.flush()
-                        
-                        socket.close()
-                    } catch (_: Exception) {
-                        // Keep loop running smoothly for incoming stream
-                    }
-                }
+                    out.write(buffer, 0, length)
+                    out.flush()
+                } else if (length < 0) break
             }
         } catch (e: Exception) {
             if (isRunning) {
-                Log.e(TAG, "Packet forwarding loop ended", e)
+                Log.e(TAG, "Packet forwarding loop error", e)
             }
+        } finally {
+            try { relaySocket?.close() } catch (_: Exception) {}
         }
     }
 
