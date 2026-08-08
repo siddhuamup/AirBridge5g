@@ -56,7 +56,9 @@ func main() {
 			reloadedCfg := config.LoadFromEnv()
 			if daemon != nil {
 				daemon.UpdateDaemonConfig(services.DaemonConfig{
-					NodeID: reloadedCfg.NodeID,
+					NodeID:       reloadedCfg.NodeID,
+					GRPCAddress:  os.Getenv("SECUREMESH_GRPC_ADDR"),
+					ProxyAddress: os.Getenv("SECUREMESH_PROXY_ADDR"),
 				})
 			}
 			log.Printf("[airbridge] hot config reloaded successfully (NodeID=%s)", reloadedCfg.NodeID)

@@ -117,6 +117,35 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
     });
   }
 
+  @override
+  Future<DaemonStatus> getStatus() async {
+    return _retryCall('getStatus', () async {
+      final response = await _client.getStatus(pb.GetStatusRequest());
+      return DaemonStatus(
+        startedAtUnixMs: response.startedAtUnixMs.toInt(),
+        tunnelState: response.state.name,
+      );
+    });
+  }
+
+  @override
+  Future<bool> setPrivacyConfig({
+    bool? dohEnabled,
+    bool? killSwitchEnabled,
+    bool? ttlEnabled,
+    bool? fragmenterEnabled,
+    bool? uaHarmonizeEnabled,
+  }) async {
+    return _retryCall('setPrivacyConfig', () async {
+      final req = pb.SetPrivacyConfigRequest();
+      if (ttlEnabled != null) req.ttlEnabled = ttlEnabled;
+      if (fragmenterEnabled != null) req.fragmenterEnabled = fragmenterEnabled;
+      if (uaHarmonizeEnabled != null) req.uaHarmonizeEnabled = uaHarmonizeEnabled;
+      final response = await _client.setPrivacyConfig(req);
+      return response.success;
+    });
+  }
+
   /// Shuts down the gRPC channel.
   Future<void> dispose() async {
     await _channel.shutdown();

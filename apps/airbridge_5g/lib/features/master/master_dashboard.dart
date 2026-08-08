@@ -201,7 +201,8 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
   }
 
   Widget _buildStatsRow(TrafficData data) {
-    final elapsed = DateTime.now().difference(_sessionStart);
+    final daemonStart = ref.watch(sessionStartTimeProvider) ?? _sessionStart;
+    final elapsed = DateTime.now().difference(daemonStart);
     final minutes = elapsed.inMinutes;
     final seconds = elapsed.inSeconds % 60;
 

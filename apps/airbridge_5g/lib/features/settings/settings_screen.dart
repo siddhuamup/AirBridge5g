@@ -23,11 +23,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final daemonClient = ref.read(daemonProvider);
       await daemonClient.setPrivacyConfig(
+        dohEnabled: _dohEnabled,
+        killSwitchEnabled: _killSwitchEnabled,
         ttlEnabled: _ttlEnabled,
         fragmenterEnabled: _dpiEnabled,
         uaHarmonizeEnabled: _uaEnabled,
       );
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Privacy config sync error: $e')),
+        );
+      }
+    }
   }
 
   @override

@@ -30,6 +30,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   String _masterNodeName = 'airbridge-master';
   String _connectedProxyHost = '';
   int _measuredLatencyMs = 12;
+  Timer? _pingTimer;
 
   @override
   void initState() {
@@ -44,8 +45,28 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
     );
   }
 
+  void _startPingLoop() {
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!_isConnected) return;
+      final stopwatch = Stopwatch()..start();
+      try {
+        await ref.read(daemonProvider).getConnectedPeers();
+        stopwatch.stop();
+        if (mounted) {
+          setState(() {
+            _measuredLatencyMs = max(1, stopwatch.elapsedMilliseconds);
+          });
+        }
+      } catch (_) {
+        stopwatch.stop();
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _pingTimer?.cancel();
     _manualProxyController.dispose();
     _entryController.dispose();
     _scanLineController.dispose();
@@ -85,6 +106,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
               _isConnected = true;
               _isConnecting = false;
             });
+            _startPingLoop();
             _scanLineController.stop();
           } else if (mounted) {
             setState(() => _isConnecting = false);
@@ -163,6 +185,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
           _isConnected = true;
           _isConnecting = false;
         });
+        _startPingLoop();
       } else if (mounted) {
         setState(() => _isConnecting = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +203,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   }
 
   Future<void> _disconnect() async {
+    _pingTimer?.cancel();
     HapticFeedback.mediumImpact();
     await PlatformNetworkManager.disableNetworkTunnel();
     await ref.read(daemonProvider).stopTunnel();

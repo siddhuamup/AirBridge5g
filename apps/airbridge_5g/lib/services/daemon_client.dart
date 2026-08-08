@@ -3,6 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/role_provider.dart';
 import '../utils/crypto_utils.dart';
 
+class DaemonStatus {
+  final int startedAtUnixMs;
+  final String tunnelState;
+
+  const DaemonStatus({
+    this.startedAtUnixMs = 0,
+    this.tunnelState = 'TUNNEL_STATE_STOPPED',
+  });
+}
+
 /// Client interface for communicating with the AirBridge 5G Go Daemon.
 abstract class AirBridgeDaemonClient {
   Future<bool> startTunnel(NodeRole role);
@@ -11,6 +21,14 @@ abstract class AirBridgeDaemonClient {
   Future<bool> connectWithQR(String qrPayload);
   Stream<Map<String, dynamic>> streamTrafficStats();
   Future<int> getConnectedPeers();
+  Future<DaemonStatus> getStatus();
+  Future<bool> setPrivacyConfig({
+    bool? dohEnabled,
+    bool? killSwitchEnabled,
+    bool? ttlEnabled,
+    bool? fragmenterEnabled,
+    bool? uaHarmonizeEnabled,
+  });
 }
 
 /// Simulated Daemon Client for local UI development and testing.
@@ -74,6 +92,27 @@ class LocalDaemonClient implements AirBridgeDaemonClient {
   @override
   Future<int> getConnectedPeers() async {
     return _isRunning ? 3 : 0;
+  }
+
+  @override
+  Future<DaemonStatus> getStatus() async {
+    return DaemonStatus(
+      startedAtUnixMs: _isRunning
+          ? DateTime.now().subtract(const Duration(minutes: 5)).millisecondsSinceEpoch
+          : 0,
+      tunnelState: _isRunning ? 'TUNNEL_STATE_RUNNING' : 'TUNNEL_STATE_STOPPED',
+    );
+  }
+
+  @override
+  Future<bool> setPrivacyConfig({
+    bool? dohEnabled,
+    bool? killSwitchEnabled,
+    bool? ttlEnabled,
+    bool? fragmenterEnabled,
+    bool? uaHarmonizeEnabled,
+  }) async {
+    return true;
   }
 }
 

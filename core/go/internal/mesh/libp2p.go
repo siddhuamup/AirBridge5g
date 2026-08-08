@@ -394,7 +394,9 @@ func (s *LibP2PService) peerHealthLoop() {
 			stale := make([]string, 0)
 			cutoff := time.Now().UTC().Add(-60 * time.Second)
 			for id, cp := range s.peers {
-				if cp.lastSeen.Before(cutoff) {
+				if cp.conn != nil {
+					cp.lastSeen = time.Now().UTC()
+				} else if cp.lastSeen.Before(cutoff) {
 					stale = append(stale, id)
 				}
 			}

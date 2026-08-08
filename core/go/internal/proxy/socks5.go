@@ -356,7 +356,9 @@ func (s *Server) authenticatePassword(conn net.Conn) error {
 
 	if !s.cfg.Auth.Validate(string(uname), string(passwd)) {
 		s.metrics.AuthFailures.Add(1)
-		_, _ = conn.Write([]byte{0x01, 0x01}) // auth failure
+		if _, err := conn.Write([]byte{0x01, 0x01}); err != nil {
+			return fmt.Errorf("write auth failure response: %w", err)
+		}
 		return ErrAuthFailed
 	}
 
