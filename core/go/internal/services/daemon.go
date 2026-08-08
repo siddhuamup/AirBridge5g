@@ -208,6 +208,26 @@ func (d *Daemon) StartedAt() time.Time {
 	return d.startedAt
 }
 
+// UpdateDaemonConfig updates the active configuration live at runtime.
+func (d *Daemon) UpdateDaemonConfig(newCfg DaemonConfig) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if newCfg.NodeID != "" {
+		d.cfg.NodeID = newCfg.NodeID
+	}
+	if newCfg.ProxyAddress != "" {
+		d.cfg.ProxyAddress = newCfg.ProxyAddress
+	}
+	if newCfg.GRPCAddress != "" {
+		d.cfg.GRPCAddress = newCfg.GRPCAddress
+	}
+	if newCfg.QUICPort > 0 {
+		d.cfg.QUICPort = newCfg.QUICPort
+	}
+	log.Printf("[airbridge-daemon] live config updated (nodeID=%s, proxyAddr=%s, grpcAddr=%s)",
+		d.cfg.NodeID, d.cfg.ProxyAddress, d.cfg.GRPCAddress)
+}
+
 // TunnelState returns the current tunnel state safely.
 func (d *Daemon) TunnelState() TunnelState {
 	d.mu.RLock()

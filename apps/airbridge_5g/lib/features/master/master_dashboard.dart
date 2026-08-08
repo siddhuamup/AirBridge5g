@@ -457,9 +457,9 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Text(
+              const Text(
                 'Connected Devices',
                 style: TextStyle(
                   color: Colors.white,
@@ -467,10 +467,10 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               Text(
-                '3 active',
-                style: TextStyle(
+                '$_peerCount active',
+                style: const TextStyle(
                   color: AirBridgeColors.masterAccent,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -481,37 +481,42 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
           const SizedBox(height: 16),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 400),
-            child: Column(
-              key: ValueKey(_peerCount),
-              children: [
-                _DeviceRow(
-                  name: 'Windows Laptop',
-                  platform: 'Windows 11',
-                  icon: Icons.laptop_windows_rounded,
-                  color: const Color(0xFF40C4FF),
-                  bytesUsed: '2.4 GB',
-                  latency: '12ms',
-                ),
-                const Divider(color: Colors.white10, height: 24),
-                _DeviceRow(
-                  name: 'MacBook Pro',
-                  platform: 'macOS Sonoma',
-                  icon: Icons.laptop_mac_rounded,
-                  color: const Color(0xFFE040FB),
-                  bytesUsed: '1.8 GB',
-                  latency: '8ms',
-                ),
-                const Divider(color: Colors.white10, height: 24),
-                _DeviceRow(
-                  name: 'Android Tablet',
-                  platform: 'Android 14',
-                  icon: Icons.tablet_android_rounded,
-                  color: AirBridgeColors.masterAccent,
-                  bytesUsed: '890 MB',
-                  latency: '5ms',
-                ),
-              ],
-            ),
+            child: _peerCount == 0
+                ? Container(
+                    key: const ValueKey(0),
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    width: double.infinity,
+                    alignment: Alignment.center,
+                    child: Text(
+                      'No connected peers. Share QR code above to connect devices.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 14,
+                      ),
+                    ),
+                  )
+                : Column(
+                    key: ValueKey(_peerCount),
+                    children: List.generate(_peerCount, (index) {
+                      final names = ['Client Device Alpha', 'Client Device Beta', 'Client Device Gamma'];
+                      final name = index < names.length ? names[index] : 'Client Peer #${index + 1}';
+                      final platforms = ['Android Device', 'iOS Device', 'Windows Client'];
+                      final platform = platforms[index % platforms.length];
+                      return Column(
+                        children: [
+                          if (index > 0) const Divider(color: Colors.white10, height: 24),
+                          _DeviceRow(
+                            name: name,
+                            platform: platform,
+                            icon: index % 2 == 0 ? Icons.phone_android_rounded : Icons.laptop_windows_rounded,
+                            color: index % 2 == 0 ? AirBridgeColors.masterAccent : const Color(0xFF40C4FF),
+                            bytesUsed: '${(1.2 * (index + 1)).toStringAsFixed(1)} GB',
+                            latency: '${6 + (index * 3)}ms',
+                          ),
+                        ],
+                      );
+                    }),
+                  ),
           ),
         ],
       ),

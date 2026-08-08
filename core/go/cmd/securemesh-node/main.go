@@ -45,6 +45,8 @@ func main() {
 
 	cfg := config.LoadFromEnv()
 
+	var daemon *services.Daemon
+
 	// === Hot Config Reloading (SIGHUP) ===
 	sighupCh := make(chan os.Signal, 1)
 	signal.Notify(sighupCh, syscall.SIGHUP)
@@ -52,6 +54,11 @@ func main() {
 		for range sighupCh {
 			log.Printf("[airbridge] SIGHUP received: reloading configuration from environment...")
 			reloadedCfg := config.LoadFromEnv()
+			if daemon != nil {
+				daemon.UpdateDaemonConfig(services.DaemonConfig{
+					NodeID: reloadedCfg.NodeID,
+				})
+			}
 			log.Printf("[airbridge] hot config reloaded successfully (NodeID=%s)", reloadedCfg.NodeID)
 		}
 	}()
@@ -151,7 +158,7 @@ func main() {
 		log.Fatalf("[airbridge] init mesh: %v", err)
 	}
 
-	daemon := services.NewDaemon(
+	daemon = services.NewDaemon(
 		daemonCfg,
 		proxyServer,
 		meshService,
