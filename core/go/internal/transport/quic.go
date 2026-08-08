@@ -139,9 +139,8 @@ func (s *quicStream) Close() error {
 
 // QUICTransport implements the Dialer and Listener interfaces using QUIC.
 // This implementation uses TLS 1.3 over TCP as a QUIC-like transport layer.
-// In production, this would use github.com/quic-go/quic-go for true QUIC/UDP.
-// The interface remains the same — swap the underlying transport when
-// quic-go is available in go.mod.
+// When quic-go is added to go.mod, swap the underlying transport to real QUIC/UDP
+// while keeping the same interface contract.
 type QUICTransport struct {
 	TLSConfig *tls.Config
 	cfg       QUICConfig
@@ -150,6 +149,8 @@ type QUICTransport struct {
 	mu        sync.Mutex
 	ctx       context.Context
 	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	streamCh  chan Stream
 }
 
 // NewQUICTransport creates a new QUIC transport with the given TLS config.
@@ -218,10 +219,12 @@ func (t *QUICTransport) Listen(ctx context.Context, profile protocol.SessionProf
 
 	log.Printf("[airbridge-quic] listening on %s (ALPN=%s)", t.cfg.BindAddress, QUICALPNAirBridge)
 
-	streamCh := make(chan Stream, t.cfg.MaxStreams)
+	t.streamCh = make(chan Stream, t.cfg.MaxStreams)
 
+	t.wg.Add(1)
 	go func() {
-		defer close(streamCh)
+		defer t.wg.Done()
+		defer close(t.streamCh)
 		for {
 			conn, err := t.listener.Accept()
 			if err != nil {
@@ -250,7 +253,7 @@ func (t *QUICTransport) Listen(ctx context.Context, profile protocol.SessionProf
 			}
 
 			select {
-			case streamCh <- stream:
+			case t.streamCh <- stream:
 			case <-t.ctx.Done():
 				stream.Close()
 				return
@@ -266,7 +269,7 @@ func (t *QUICTransport) Listen(ctx context.Context, profile protocol.SessionProf
 		}
 	}()
 
-	return streamCh, nil
+	return t.streamCh, nil
 }
 
 // Shutdown gracefully shuts down the QUIC transport.
@@ -276,6 +279,7 @@ func (t *QUICTransport) Shutdown() error {
 	if t.cancel != nil {
 		t.cancel()
 	}
+	t.wg.Wait()
 	if t.listener != nil {
 		return t.listener.Close()
 	}

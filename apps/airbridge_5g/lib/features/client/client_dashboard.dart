@@ -11,8 +11,12 @@ import '../../utils/crypto_utils.dart';
 
 /// Client Dashboard — Minimalist Sky Blue theme.
 /// Features QR scanner, one-click connect, and connection status.
+/// Supports deep linking via query parameters: ?host=X&port=Y
 class ClientDashboard extends ConsumerStatefulWidget {
-  const ClientDashboard({super.key});
+  final String? deepLinkHost;
+  final int? deepLinkPort;
+
+  const ClientDashboard({super.key, this.deepLinkHost, this.deepLinkPort});
 
   @override
   ConsumerState<ClientDashboard> createState() => _ClientDashboardState();
@@ -43,6 +47,14 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
       vsync: this,
       duration: const Duration(seconds: 2),
     );
+
+    // Handle deep link auto-connect
+    if (widget.deepLinkHost != null && widget.deepLinkPort != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _manualProxyController.text = '${widget.deepLinkHost}:${widget.deepLinkPort}';
+        _connectToProxy(widget.deepLinkHost!, widget.deepLinkPort!);
+      });
+    }
   }
 
   void _startPingLoop() {
