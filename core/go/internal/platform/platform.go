@@ -2,7 +2,10 @@
 // for the AirBridge 5G daemon.
 package platform
 
-import "runtime"
+import (
+	"os"
+	"runtime"
+)
 
 // Platform identifies the current OS platform.
 type Platform string
@@ -119,7 +122,11 @@ func DefaultVPNConfig() VPNConfig {
 
 // isAndroidEnv checks if the process is running on Android.
 func isAndroidEnv() bool {
-	// Android runs on Linux kernel but has specific env markers
-	// In production, check for /system/build.prop or ANDROID_ROOT env var
+	if os.Getenv("ANDROID_ROOT") != "" || os.Getenv("ANDROID_DATA") != "" {
+		return true
+	}
+	if _, err := os.Stat("/system/build.prop"); err == nil {
+		return true
+	}
 	return false
 }

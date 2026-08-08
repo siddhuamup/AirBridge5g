@@ -1,6 +1,6 @@
 module github.com/example/securemesh/core
 
-go 1.22.0
+go 1.25.0
 
 require (
 	github.com/flynn/noise v1.1.0

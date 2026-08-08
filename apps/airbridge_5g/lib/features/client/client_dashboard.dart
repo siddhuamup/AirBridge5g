@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../app.dart';
 import '../../providers/role_provider.dart';
 import '../../providers/daemon_provider.dart';
+import '../../services/platform_vpn.dart';
+import '../../utils/crypto_utils.dart';
 
 /// Client Dashboard — Minimalist Sky Blue theme.
 /// Features QR scanner, one-click connect, and connection status.
@@ -20,6 +23,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   late final AnimationController _entryController;
   late final AnimationController _scanLineController;
   final MobileScannerController _scannerController = MobileScannerController();
+  final TextEditingController _manualProxyController = TextEditingController(text: '127.0.0.1:1080');
   bool _isConnected = false;
   bool _isScanning = false;
   bool _isConnecting = false;
@@ -39,6 +43,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
 
   @override
   void dispose() {
+    _manualProxyController.dispose();
     _entryController.dispose();
     _scanLineController.dispose();
     _scannerController.dispose();
@@ -55,13 +60,20 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
     for (final barcode in barcodes) {
       final rawValue = barcode.rawValue;
       if (rawValue != null && rawValue.isNotEmpty && !_isConnecting) {
+        HapticFeedback.lightImpact();
         setState(() {
           _isConnecting = true;
         });
+        _scannerController.stop();
         try {
           final daemonClient = ref.read(daemonProvider);
           final success = await daemonClient.connectWithQR(rawValue);
           if (success && mounted) {
+            final creds = QRCredentials.decode(rawValue);
+            await PlatformNetworkManager.enableNetworkTunnel(
+              proxyHost: creds.proxyHost,
+              proxyPort: creds.proxyPort,
+            );
             setState(() {
               _isScanning = false;
               _isConnected = true;
@@ -84,6 +96,53 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
         }
         break;
       }
+    }
+  }
+
+  Future<void> _connectManually() async {
+    final input = _manualProxyController.text.trim();
+    if (input.isEmpty) return;
+    final parts = input.split(':');
+    final host = parts[0];
+    final port = parts.length > 1 ? int.tryParse(parts[1]) ?? 1080 : 1080;
+
+    HapticFeedback.lightImpact();
+    setState(() => _isConnecting = true);
+
+    try {
+      final success = await PlatformNetworkManager.enableNetworkTunnel(
+        proxyHost: host,
+        proxyPort: port,
+      );
+      if (success && mounted) {
+        setState(() {
+          _isConnected = true;
+          _isConnecting = false;
+        });
+      } else if (mounted) {
+        setState(() => _isConnecting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to enable proxy/tunnel')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isConnecting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Connection error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _disconnect() async {
+    HapticFeedback.mediumImpact();
+    await PlatformNetworkManager.disableNetworkTunnel();
+    await ref.read(daemonProvider).stopTunnel();
+    if (mounted) {
+      setState(() {
+        _isConnected = false;
+      });
     }
   }
 
@@ -357,61 +416,65 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   }
 
   Widget _buildOneClickConnect() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AirBridgeColors.clientPrimary,
-            AirBridgeColors.clientAccent,
+    return InkWell(
+      onTap: _connectManually,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AirBridgeColors.clientPrimary,
+              AirBridgeColors.clientAccent,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: AirBridgeColors.clientPrimary.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AirBridgeColors.clientPrimary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.2),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.2),
+              ),
+              child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 28),
             ),
-            child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 28),
-          ),
-          const SizedBox(width: 16),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'One-Click Connect',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'One-Click Connect',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Auto-detect and connect to nearby Master nodes',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
+                  SizedBox(height: 4),
+                  Text(
+                    'Auto-detect and connect to nearby Master nodes',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.arrow_forward_rounded, color: Colors.white70),
-        ],
+            const Icon(Icons.arrow_forward_rounded, color: Colors.white70),
+          ],
+        ),
       ),
     );
   }
@@ -437,6 +500,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
           ),
           const SizedBox(height: 16),
           TextField(
+            controller: _manualProxyController,
             decoration: InputDecoration(
               hintText: 'Proxy Address (e.g., 192.168.1.100:1080)',
               prefixIcon: const Icon(Icons.link_rounded, size: 20),
@@ -453,7 +517,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: _connectManually,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AirBridgeColors.clientPrimary,
                 side: const BorderSide(color: AirBridgeColors.clientPrimary),
@@ -555,7 +619,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
         children: [
           _DetailRow(label: 'Master Node', value: 'airbridge-master'),
           const Divider(height: 20),
-          _DetailRow(label: 'Proxy', value: '192.168.1.100:1080'),
+          _DetailRow(label: 'Proxy', value: _manualProxyController.text.isNotEmpty ? _manualProxyController.text : '192.168.1.100:1080'),
           const Divider(height: 20),
           _DetailRow(label: 'Protocol', value: 'QUIC / TLS 1.3'),
           const Divider(height: 20),
@@ -572,9 +636,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
       width: double.infinity,
       height: 52,
       child: OutlinedButton.icon(
-        onPressed: () {
-          setState(() => _isConnected = false);
-        },
+        onPressed: _disconnect,
         icon: const Icon(Icons.link_off_rounded),
         label: const Text('Disconnect'),
         style: OutlinedButton.styleFrom(

@@ -239,14 +239,27 @@ func (d *Daemon) StartTunnel(ctx context.Context) error {
 
 	// Start SOCKS5 proxy (master only)
 	if d.role == RoleMaster && d.proxyServer != nil {
+		bindErrCh := make(chan error, 1)
 		go func() {
 			if err := d.proxyServer.ListenAndServe(d.ctx); err != nil {
 				log.Printf("[airbridge-daemon] proxy server error: %v", err)
 				d.mu.Lock()
 				d.tunnelState = TunnelDegraded
 				d.mu.Unlock()
+				select {
+				case bindErrCh <- err:
+				default:
+				}
 			}
 		}()
+
+		// Wait briefly to check if initial net.Listen failed
+		select {
+		case err := <-bindErrCh:
+			return fmt.Errorf("socks5 bind failed: %w", err)
+		case <-time.After(100 * time.Millisecond):
+			// Bind succeeded
+		}
 	}
 
 	d.tunnelState = TunnelRunning
@@ -378,8 +391,16 @@ func (d *Daemon) collectTrafficStats() {
 			elapsed := now.Sub(prevTime).Seconds()
 
 			if elapsed > 0 {
-				snapshot.ThroughputInBPS = float64(snapshot.BytesIn-prevIn) * 8 / elapsed
-				snapshot.ThroughputOutBPS = float64(snapshot.BytesOut-prevOut) * 8 / elapsed
+				bytesInDiff := snapshot.BytesIn - prevIn
+				if bytesInDiff < 0 {
+					bytesInDiff = 0
+				}
+				bytesOutDiff := snapshot.BytesOut - prevOut
+				if bytesOutDiff < 0 {
+					bytesOutDiff = 0
+				}
+				snapshot.ThroughputInBPS = float64(bytesInDiff) * 8 / elapsed
+				snapshot.ThroughputOutBPS = float64(bytesOutDiff) * 8 / elapsed
 			}
 
 			snapshot.Timestamp = now

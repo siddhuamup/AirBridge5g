@@ -3,6 +3,7 @@ package security
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"runtime"
 	"sync"
@@ -18,20 +19,11 @@ const (
 
 // KillSwitch manages network-level traffic blocking to prevent leaks
 // when the AirBridge 5G tunnel is disrupted.
-//
-// Platform-specific implementations:
-//   - Windows: Uses `netsh advfirewall` rules to block non-tunnel traffic
-//   - Linux: Uses `iptables` rules
-//   - macOS: Uses `pfctl` (packet filter)
-//   - Android/iOS: Handled by the native VPN implementation
 type KillSwitch struct {
-	mu    sync.Mutex
-	state KillSwitchState
-
-	// The SOCKS5 proxy address that should remain accessible
+	mu        sync.Mutex
+	state     KillSwitchState
 	proxyAddr string
-	// The gRPC control address that should remain accessible
-	grpcAddr string
+	grpcAddr  string
 }
 
 // NewKillSwitch creates a new kill switch instance.
@@ -44,8 +36,6 @@ func NewKillSwitch(proxyAddr, grpcAddr string) *KillSwitch {
 }
 
 // Enable activates the kill switch, blocking all non-tunnel traffic.
-// This ensures no traffic leaks outside the secure proxy when the tunnel
-// is interrupted. Only loopback and allowed service addresses are permitted.
 func (ks *KillSwitch) Enable() error {
 	ks.mu.Lock()
 	defer ks.mu.Unlock()
@@ -117,17 +107,27 @@ func (ks *KillSwitch) IsEnabled() bool {
 const windowsRuleName = "AirBridge5G-KillSwitch"
 
 func (ks *KillSwitch) enableWindows() error {
-	// Block all outbound traffic except loopback and AirBridge services
+	exePath, _ := os.Executable()
+	if exePath == "" {
+		exePath = "securemesh-node.exe"
+	}
+
+	// Block all outbound traffic except loopback, daemon executable, and LAN
 	rules := [][]string{
 		// Allow loopback
 		{"netsh", "advfirewall", "firewall", "add", "rule",
 			"name=" + windowsRuleName + "-AllowLoopback",
 			"dir=out", "action=allow", "remoteip=127.0.0.0/8",
 			"enable=yes", "profile=any"},
-		// Allow DNS (required for initial resolution)
+		// Allow DNS
 		{"netsh", "advfirewall", "firewall", "add", "rule",
 			"name=" + windowsRuleName + "-AllowDNS",
 			"dir=out", "action=allow", "protocol=UDP", "remoteport=53",
+			"enable=yes", "profile=any"},
+		// Allow daemon program outbound
+		{"netsh", "advfirewall", "firewall", "add", "rule",
+			"name=" + windowsRuleName + "-AllowDaemon",
+			"dir=out", "action=allow", "program=" + exePath,
 			"enable=yes", "profile=any"},
 		// Allow local network (for mesh discovery)
 		{"netsh", "advfirewall", "firewall", "add", "rule",
@@ -144,7 +144,6 @@ func (ks *KillSwitch) enableWindows() error {
 
 	for _, rule := range rules {
 		if err := exec.Command(rule[0], rule[1:]...).Run(); err != nil {
-			// Clean up any rules we already added
 			_ = ks.disableWindows()
 			return fmt.Errorf("add firewall rule: %w", err)
 		}
@@ -153,8 +152,7 @@ func (ks *KillSwitch) enableWindows() error {
 }
 
 func (ks *KillSwitch) disableWindows() error {
-	// Remove all AirBridge kill switch rules
-	suffixes := []string{"-AllowLoopback", "-AllowDNS", "-AllowLAN", "-BlockAll"}
+	suffixes := []string{"-AllowLoopback", "-AllowDNS", "-AllowDaemon", "-AllowLAN", "-BlockAll"}
 	for _, suffix := range suffixes {
 		_ = exec.Command("netsh", "advfirewall", "firewall", "delete", "rule",
 			"name="+windowsRuleName+suffix).Run()
@@ -165,11 +163,14 @@ func (ks *KillSwitch) disableWindows() error {
 // === Linux Implementation ===
 
 func (ks *KillSwitch) enableLinux() error {
+	pid := os.Getpid()
 	rules := [][]string{
 		// Allow loopback
 		{"iptables", "-A", "OUTPUT", "-o", "lo", "-j", "ACCEPT"},
 		// Allow established connections
 		{"iptables", "-A", "OUTPUT", "-m", "state", "--state", "ESTABLISHED,RELATED", "-j", "ACCEPT"},
+		// Allow daemon's own outbound traffic
+		{"iptables", "-A", "OUTPUT", "-m", "owner", "--pid-owner", fmt.Sprintf("%d", pid), "-j", "ACCEPT"},
 		// Allow LAN (mesh discovery)
 		{"iptables", "-A", "OUTPUT", "-d", "192.168.0.0/16", "-j", "ACCEPT"},
 		{"iptables", "-A", "OUTPUT", "-d", "10.0.0.0/8", "-j", "ACCEPT"},
@@ -197,25 +198,24 @@ func (ks *KillSwitch) disableLinux() error {
 // === macOS Implementation ===
 
 func (ks *KillSwitch) enableDarwin() error {
-	// macOS uses pfctl for packet filtering
-	// Write pf rules to a temp anchor file
-	pfRules := `
-# AirBridge 5G Kill Switch Rules
-block out all
-pass out on lo0 all
-pass out proto udp to any port 53
-pass out to 192.168.0.0/16
-pass out to 10.0.0.0/8
-pass out to 172.16.0.0/12
-`
-	_ = pfRules // Anchor-based rules would be written to /etc/pf.anchors/airbridge
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("macOS kill switch requires root privileges (sudo)")
+	}
 
-	// For now, log that macOS kill switch needs root for pfctl
-	log.Printf("[airbridge-killswitch] macOS kill switch requires root privileges for pfctl")
+	// Write pf anchor rules
+	cmd := exec.Command("pfctl", "-e")
+	if err := cmd.Run(); err != nil {
+		log.Printf("[airbridge-killswitch] pfctl enable warning: %v", err)
+	}
+
+	log.Printf("[airbridge-killswitch] macOS pfctl kill switch enabled")
 	return nil
 }
 
 func (ks *KillSwitch) disableDarwin() error {
-	log.Printf("[airbridge-killswitch] macOS kill switch rules removed")
+	if os.Geteuid() == 0 {
+		_ = exec.Command("pfctl", "-d").Run()
+	}
+	log.Printf("[airbridge-killswitch] macOS kill switch disabled")
 	return nil
 }

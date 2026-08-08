@@ -423,14 +423,30 @@ func (s *Server) sendReply(conn net.Conn, status byte, bindIP string, bindPort i
 		ip = net.IPv4zero
 	}
 	ip4 := ip.To4()
-	if ip4 == nil {
-		ip4 = net.IPv4zero.To4()
-	}
 
-	reply := []byte{
-		socks5Version, status, 0x00, socks5AtypIPv4,
-		ip4[0], ip4[1], ip4[2], ip4[3],
-		byte(bindPort >> 8), byte(bindPort & 0xFF),
+	var reply []byte
+	if ip4 != nil {
+		reply = make([]byte, 10)
+		reply[0] = socks5Version
+		reply[1] = status
+		reply[2] = 0x00
+		reply[3] = socks5AtypIPv4
+		copy(reply[4:8], ip4)
+		reply[8] = byte(bindPort >> 8)
+		reply[9] = byte(bindPort & 0xFF)
+	} else {
+		ip6 := ip.To16()
+		if ip6 == nil {
+			ip6 = net.IPv6zero
+		}
+		reply = make([]byte, 22)
+		reply[0] = socks5Version
+		reply[1] = status
+		reply[2] = 0x00
+		reply[3] = socks5AtypIPv6
+		copy(reply[4:20], ip6)
+		reply[20] = byte(bindPort >> 8)
+		reply[21] = byte(bindPort & 0xFF)
 	}
 	conn.Write(reply)
 }
@@ -460,11 +476,16 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 	}()
 
 	// Wait for context cancellation or relay completion
+	relayDone := make(chan struct{})
 	go func() {
-		<-ctx.Done()
-		client.SetDeadline(time.Now())
-		target.SetDeadline(time.Now())
+		select {
+		case <-ctx.Done():
+			client.SetDeadline(time.Now())
+			target.SetDeadline(time.Now())
+		case <-relayDone:
+		}
 	}()
 
 	wg.Wait()
+	close(relayDone)
 }

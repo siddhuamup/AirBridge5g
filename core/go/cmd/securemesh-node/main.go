@@ -78,10 +78,14 @@ func main() {
 	}()
 
 	// === Protocol Negotiation ===
-	profile, err := protocol.NegotiateCapabilities(
-		protocol.DefaultCapabilities(),
-		protocol.DefaultCapabilities(),
-	)
+	serverCaps := protocol.DefaultCapabilities()
+	clientCaps := protocol.Capabilities{
+		AEADSuites:     []protocol.AEADSuite{protocol.AEADChaCha20Poly1305, protocol.AEADAES256GCM},
+		Transports:     []protocol.Transport{protocol.TransportQUIC, protocol.TransportSOCKS5TLS},
+		HandshakeModes: []protocol.NoisePattern{protocol.NoiseIK, protocol.NoiseXX},
+		ProtocolVersion: "securemesh/1",
+	}
+	profile, err := protocol.NegotiateCapabilities(serverCaps, clientCaps)
 	if err != nil {
 		log.Fatalf("[airbridge] negotiate defaults: %v", err)
 	}

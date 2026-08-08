@@ -22,17 +22,21 @@ class AirBridgeApp extends ConsumerWidget {
     final role = ref.watch(roleProvider);
 
     if (!kIsWeb && Platform.isWindows) {
+      final fluentAccent = role == NodeRole.master
+          ? fluent.Colors.green
+          : (role == NodeRole.client ? fluent.Colors.teal : fluent.Colors.blue);
+
       return fluent.FluentApp.router(
         title: 'AirBridge 5G',
         debugShowCheckedModeBanner: false,
         routerConfig: router,
         theme: fluent.FluentThemeData(
-          accentColor: fluent.Colors.blue,
+          accentColor: fluentAccent,
           visualDensity: fluent.VisualDensity.standard,
         ),
         darkTheme: fluent.FluentThemeData(
           brightness: Brightness.dark,
-          accentColor: fluent.Colors.blue,
+          accentColor: fluentAccent,
         ),
       );
     }

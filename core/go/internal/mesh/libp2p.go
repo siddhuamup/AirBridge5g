@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -229,6 +230,22 @@ func (s *LibP2PService) Connect(ctx context.Context, peer PeerInfo) error {
 		return ErrSelfConnect
 	}
 
+	// Dial peer address if provided to verify real network connectivity
+	if len(peer.Addrs) > 0 {
+		dialed := false
+		for _, addr := range peer.Addrs {
+			conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
+			if err == nil {
+				conn.Close()
+				dialed = true
+				break
+			}
+		}
+		if !dialed {
+			log.Printf("[airbridge-mesh] peer %s addrs %v unreachable", peer.ID, peer.Addrs)
+		}
+	}
+
 	s.peersMu.Lock()
 	defer s.peersMu.Unlock()
 
@@ -412,8 +429,10 @@ func (s *LibP2PService) mdnsDiscoveryLoop() {
 		case <-s.ctx.Done():
 			return
 		case <-ticker.C:
-			// Emit discovery heartbeat event on general topic
-			s.stats.DiscoveredPeers.Add(1)
+			s.peersMu.RLock()
+			count := len(s.peers)
+			s.peersMu.RUnlock()
+			s.stats.DiscoveredPeers.Store(int64(count))
 		}
 	}
 }

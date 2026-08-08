@@ -62,8 +62,12 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
           _peerCount = peers;
         });
       }
-    } catch (_) {
-      // Fallback if daemon calls fail
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Daemon status error: $e')),
+        );
+      }
     }
   }
 
@@ -278,7 +282,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
           const SizedBox(height: 16),
           // Refresh button
           TextButton.icon(
-            onPressed: () {},
+            onPressed: _fetchDaemonStatus,
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text('Regenerate'),
             style: TextButton.styleFrom(
@@ -406,8 +410,8 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                         ),
                       ),
                     ),
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.linear,
+                    duration: const Duration(milliseconds: 350),
+                    curve: Curves.easeInOutCubic,
                   ),
           ),
         ],
