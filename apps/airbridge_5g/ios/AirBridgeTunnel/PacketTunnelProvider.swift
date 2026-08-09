@@ -210,8 +210,53 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         
         packet.replaceSubrange(40..<totalLen, with: payload)
         session.serverSeq += UInt32(payload.count)
+
+        // Calculate IPv4 Checksum
+        let ipChecksum = computeChecksum(packet, offset: 0, length: 20)
+        packet[10] = UInt8((ipChecksum >> 8) & 0xFF)
+        packet[11] = UInt8(ipChecksum & 0xFF)
+
+        // Calculate TCP Checksum
+        let tcpChecksum = computeTcpChecksum(packet, payloadLen: payload.count, srcIp: session.dstIp, dstIp: session.srcIp)
+        packet[36] = UInt8((tcpChecksum >> 8) & 0xFF)
+        packet[37] = UInt8(tcpChecksum & 0xFF)
         
         packetFlow.writePackets([packet], withProtocols: [NSNumber(value: AF_INET)])
+    }
+
+    private func computeChecksum(_ data: Data, offset: Int, length: Int) -> UInt16 {
+        var sum: UInt32 = 0
+        data.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) in
+            guard let bytes = rawBuffer.bindMemory(to: UInt8.self).baseAddress else { return }
+            var i = 0
+            while i < length - 1 {
+                let word = (UInt32(bytes[offset + i]) << 8) | UInt32(bytes[offset + i + 1])
+                sum += word
+                i += 2
+            }
+            if i < length {
+                sum += UInt32(bytes[offset + i]) << 8
+            }
+        }
+        while (sum >> 16) > 0 {
+            sum = (sum & 0xFFFF) + (sum >> 16)
+        }
+        return UInt16(~sum & 0xFFFF)
+    }
+
+    private func computeTcpChecksum(_ packet: Data, payloadLen: Int, srcIp: UInt32, dstIp: UInt32) -> UInt16 {
+        var pseudoHeader = Data(count: 12)
+        var src = srcIp
+        var dst = dstIp
+        pseudoHeader.replaceSubrange(0..<4, with: Data(bytes: &src, count: 4))
+        pseudoHeader.replaceSubrange(4..<8, with: Data(bytes: &dst, count: 4))
+        pseudoHeader[8] = 0
+        pseudoHeader[9] = 6 // protocol TCP
+        var tcpLenBig = UInt16(20 + payloadLen).bigEndian
+        pseudoHeader.replaceSubrange(10..<12, with: Data(bytes: &tcpLenBig, count: 2))
+        
+        let tcpData = pseudoHeader + packet.subdata(in: 20..<(20 + 20 + payloadLen))
+        return computeChecksum(tcpData, offset: 0, length: tcpData.count)
     }
 
     override func stopTunnel(with reason: NEProviderStopReason, completionHandler: @escaping () -> Void) {

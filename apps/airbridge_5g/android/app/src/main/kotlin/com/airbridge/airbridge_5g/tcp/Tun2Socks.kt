@@ -182,7 +182,7 @@ class Tun2Socks(
         val seq: Int,
         val flags: Int,
         val payload: ByteArray?,
-        val sentTimeMs: Long = System.currentTimeMillis()
+        var sentTimeMs: Long = System.currentTimeMillis()
     )
 
     inner class TcpConnection(
@@ -286,8 +286,13 @@ class Tun2Socks(
                     }
                 }
             } else if (seq < clientSeq) {
-                // Duplicate ACK received — retransmit earliest unacked segment if any
-                retransmitEarliest()
+                if (payload.isNotEmpty()) {
+                    // Client retransmitted old data packet — ACK current expected clientSeq
+                    manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, serverSeq, clientSeq, ACK, null)
+                } else {
+                    // Empty payload duplicate ACK — fast retransmit earliest unacked segment
+                    retransmitEarliest()
+                }
             }
         }
 
@@ -312,6 +317,7 @@ class Tun2Socks(
             val now = System.currentTimeMillis()
             for (seg in unackedQueue) {
                 if (now - seg.sentTimeMs > 1000) { // 1 sec RTO timeout
+                    seg.sentTimeMs = now // Update timestamp on retransmit
                     manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, seg.seq, clientSeq, seg.flags, seg.payload)
                 }
             }
@@ -319,7 +325,11 @@ class Tun2Socks(
 
         private fun retransmitEarliest() {
             val earliest = unackedQueue.peek() ?: return
-            manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, earliest.seq, clientSeq, earliest.flags, earliest.payload)
+            val now = System.currentTimeMillis()
+            if (now - earliest.sentTimeMs > 200) { // Throttle duplicate ACK retransmissions
+                earliest.sentTimeMs = now
+                manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, earliest.seq, clientSeq, earliest.flags, earliest.payload)
+            }
         }
 
         fun close() {
