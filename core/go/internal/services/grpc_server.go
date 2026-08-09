@@ -397,12 +397,15 @@ func (lim *ipRateLimiter) allow(ip string, limit int, window time.Duration) bool
 		}
 	}
 
-	if len(valid) >= limit {
-		lim.requests[ip] = valid
+	fresh := make([]time.Time, len(valid), len(valid)+1)
+	copy(fresh, valid)
+
+	if len(fresh) >= limit {
+		lim.requests[ip] = fresh
 		return false
 	}
 
-	lim.requests[ip] = append(valid, now)
+	lim.requests[ip] = append(fresh, now)
 	return true
 }
 

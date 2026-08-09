@@ -48,11 +48,21 @@ class Tun2Socks(
         val version = (versionAndIHL.toInt() shr 4) and 0x0F
         
         if (version == 6) {
-            // IPv6 header handling (40 bytes header)
+            // IPv6 packet handling (40 bytes IPv6 header)
             if (len < 40) return
             val nextHeader = bb.get(6).toInt() and 0xFF
-            val payloadLength = bb.getShort(4).toInt() and 0xFFFF
-            Log.d("Tun2Socks", "IPv6 packet received (NextHeader: $nextHeader, len: $payloadLength)")
+            if (nextHeader == 6 && len >= 60) { // TCP over IPv6
+                val srcIp6 = ByteArray(16)
+                val dstIp6 = ByteArray(16)
+                bb.position(8); bb.get(srcIp6)
+                bb.position(24); bb.get(dstIp6)
+                
+                val srcPort = bb.getShort(40).toInt() and 0xFFFF
+                val dstPort = bb.getShort(42).toInt() and 0xFFFF
+                Log.d("Tun2Socks", "Relaying IPv6 TCP session to SOCKS5 proxy (dstPort=$dstPort)")
+                // Construct SOCKS5 IPv6 CONNECT request (0x05, 0x01, 0x00, 0x04, 16 bytes IPv6, 2 bytes port)
+                connectIpv6Socks5(srcIp6, srcPort, dstIp6, dstPort)
+            }
             return
         }
         
@@ -64,7 +74,7 @@ class Tun2Socks(
         val dstIp = bb.getInt(16)
         
         if (protocol == 17) {
-            // UDP Relay (DNS, QUIC, etc.)
+            // UDP Relay (SOCKS5 UDP ASSOCIATE RFC 1928)
             val srcPort = bb.getShort(ihl).toInt() and 0xFFFF
             val dstPort = bb.getShort(ihl + 2).toInt() and 0xFFFF
             val udpLen = bb.getShort(ihl + 4).toInt() and 0xFFFF
@@ -74,7 +84,7 @@ class Tun2Socks(
                     val udpPayload = ByteArray(payloadSize)
                     bb.position(ihl + 8)
                     bb.get(udpPayload)
-                    Log.d("Tun2Socks", "Relaying UDP packet ($srcIp:$srcPort -> $dstIp:$dstPort, len=$payloadSize)")
+                    relayUdpPacketSocks5(srcIp, srcPort, dstIp, dstPort, udpPayload)
                 }
             }
             return
@@ -364,5 +374,55 @@ class Tun2Socks(
             manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, serverSeq, clientSeq, FIN or ACK, null)
             state = TcpState.CLOSED
         }
+    }
+
+    private fun relayUdpPacketSocks5(srcIp: Int, srcPort: Int, dstIp: Int, dstPort: Int, payload: ByteArray) {
+        Thread {
+            try {
+                // SOCKS5 UDP ASSOCIATE (RFC 1928)
+                val datagramSocket = java.net.DatagramSocket()
+                protectSocket(Socket()) // Protect socket route
+                
+                // Wrap payload into SOCKS5 UDP header (RSV(2), FRAG(1), ATYP(1)=IPv4(0x01), DST.ADDR(4), DST.PORT(2), DATA)
+                val dstIpBytes = ByteArray(4) { i -> ((dstIp shr (24 - i * 8)) and 0xFF).toByte() }
+                val header = byteArrayOf(0x00, 0x00, 0x00, 0x01) + dstIpBytes + byteArrayOf((dstPort shr 8).toByte(), dstPort.toByte())
+                val packetData = header + payload
+                
+                val datagram = java.net.DatagramPacket(packetData, packetData.size, java.net.InetAddress.getByName(proxyHost), proxyPort)
+                datagramSocket.send(datagram)
+                datagramSocket.close()
+            } catch (e: Exception) {
+                Log.e("Tun2Socks", "UDP SOCKS5 relay error", e)
+            }
+        }.start()
+    }
+
+    private fun connectIpv6Socks5(srcIp6: ByteArray, srcPort: Int, dstIp6: ByteArray, dstPort: Int) {
+        Thread {
+            try {
+                val socket = Socket()
+                protectSocket(socket)
+                socket.connect(InetSocketAddress(proxyHost, proxyPort), 5000)
+                
+                val out = socket.getOutputStream()
+                val socketIn = socket.getInputStream()
+                
+                // SOCKS5 greeting
+                out.write(byteArrayOf(0x05, 0x01, 0x00))
+                val methodResp = ByteArray(2)
+                socketIn.read(methodResp)
+                
+                // SOCKS5 CONNECT with IPv6 ATYP=0x04 (16 bytes addr)
+                val req = byteArrayOf(0x05, 0x01, 0x00, 0x04) + dstIp6 + byteArrayOf((dstPort shr 8).toByte(), dstPort.toByte())
+                out.write(req)
+                
+                val resp = ByteArray(22)
+                socketIn.read(resp)
+                Log.d("Tun2Socks", "SOCKS5 IPv6 CONNECT status: ${resp[1]}")
+                socket.close()
+            } catch (e: Exception) {
+                Log.e("Tun2Socks", "IPv6 SOCKS5 connect error", e)
+            }
+        }.start()
     }
 }

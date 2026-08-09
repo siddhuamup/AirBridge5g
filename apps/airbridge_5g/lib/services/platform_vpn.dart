@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'windows_proxy.dart';
@@ -65,14 +66,16 @@ class PlatformNetworkManager {
     return false;
   }
 
-  /// Listens to network changes and automatically re-establishes VPN session
-  /// when switching between Wi-Fi and Mobile Data.
+  static Timer? _autoReconnectTimer;
+
+  /// Continuously monitors network interfaces (e.g. Wi-Fi <-> Mobile Data switch)
+  /// and automatically re-establishes active VPN session when dropped.
   static void startAutoReconnectListener({
     required String proxyHost,
     required int proxyPort,
   }) {
-    // Periodically verify tunnel liveness on network state changes
-    Future.delayed(const Duration(seconds: 3), () async {
+    _autoReconnectTimer?.cancel();
+    _autoReconnectTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       final active = await isNetworkTunnelActive();
       if (!active) {
         await enableNetworkTunnel(proxyHost: proxyHost, proxyPort: proxyPort);

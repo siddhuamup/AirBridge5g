@@ -30,7 +30,7 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
     int port = 50051,
     this.pinnedCertSha256,
   }) {
-    final credentials = (pinnedCertSha256 != null && pinnedCertSha256!.isNotEmpty)
+    final credentials = (pinnedCertSha256?.isNotEmpty == true)
         ? ChannelCredentials.secure(
             onBadCertificate: (cert, host) {
               // Verify SHA-256 certificate fingerprint

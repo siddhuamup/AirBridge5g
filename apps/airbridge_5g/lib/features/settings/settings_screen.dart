@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app.dart';
 import '../../providers/role_provider.dart';
@@ -55,11 +56,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<bool> _authenticateBiometric(BuildContext context) async {
+    try {
+      const channel = MethodChannel('com.airbridge/security');
+      final bool? authenticated = await channel.invokeMethod<bool>('authenticateBiometric');
+      if (authenticated == true) return true;
+    } catch (_) {
+      // Fallback dialog
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Biometric Security Verification'),
-        content: const Text('Authenticate with Fingerprint / FaceID to alter security settings.'),
+        title: const Row(
+          children: [
+            Icon(Icons.fingerprint_rounded, color: Colors.blueAccent),
+            SizedBox(width: 8),
+            Text('Biometric Verification'),
+          ],
+        ),
+        content: const Text('Scan Fingerprint / FaceID to alter security settings.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),

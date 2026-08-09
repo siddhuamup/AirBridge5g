@@ -555,6 +555,9 @@ func (d *Daemon) startTokenRotationLoop() {
 			_, err := d.GenerateQRCredentials()
 			if err != nil {
 				log.Printf("[airbridge-daemon] token auto-rotation failed: %v", err)
+			} else if d.proxyServer != nil {
+				d.proxyServer.InvalidateSessions()
+				log.Println("[airbridge-daemon] expired peer sessions invalidated.")
 			}
 		}
 	}

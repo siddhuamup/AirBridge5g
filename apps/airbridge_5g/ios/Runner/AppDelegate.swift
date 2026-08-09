@@ -86,13 +86,30 @@ import NetworkExtension
       "/bin/bash",
       "/usr/sbin/sshd",
       "/etc/apt",
-      "/private/var/lib/apt/"
+      "/private/var/lib/apt/",
+      "/usr/libexec/ssh-keysign"
     ]
     for path in paths {
       if FileManager.default.fileExists(atPath: path) {
         return true
       }
     }
+
+    // Test sandbox escape write permission
+    let testStr = "JailbreakTest"
+    do {
+      try testStr.write(toFile: "/private/jailbreak_test.txt", atomically: true, encoding: .utf8)
+      try? FileManager.default.removeItem(atPath: "/private/jailbreak_test.txt")
+      return true
+    } catch {
+      // Expected sandboxed error
+    }
+
+    // Test cydia URL scheme
+    if let url = URL(string: "cydia://package/com.example.package"), UIApplication.shared.canOpenURL(url) {
+      return true
+    }
+
     return false
   }
 }

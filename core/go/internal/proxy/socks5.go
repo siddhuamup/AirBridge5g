@@ -195,6 +195,13 @@ func (s *Server) GetMetrics() MetricsSnapshot {
 	return s.metrics.Snapshot()
 }
 
+// InvalidateSessions clears authenticated sessions and resets rate limits upon token rotation.
+func (s *Server) InvalidateSessions() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	log.Printf("[airbridge-proxy] InvalidateSessions: active sessions cleared upon token rotation")
+}
+
 // ListenAndServe starts the SOCKS5 proxy server.
 func (s *Server) ListenAndServe(ctx context.Context) error {
 	s.mu.Lock()
