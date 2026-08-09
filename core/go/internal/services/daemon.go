@@ -112,6 +112,7 @@ type Daemon struct {
 	stateStore    storage.StateStore
 	killSwitch    *security.KillSwitch
 	noiseKeypair  noise.DHKey
+	privacyCfg    PrivacyConfig
 
 	// Traffic history for UI graphs
 	trafficHistory []TrafficSnapshot
@@ -633,20 +634,14 @@ type PrivacyConfig struct {
 func (d *Daemon) GetPrivacyConfig() PrivacyConfig {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return PrivacyConfig{
-		DoHEnabled:         d.proxyServer != nil && d.proxyServer.GetConfig().DoHEnabled,
-		KillSwitchEnabled:  d.proxyServer != nil && d.proxyServer.GetConfig().KillSwitchEnabled,
-		TTLEnabled:         d.ttlNormalizer != nil && d.ttlNormalizer.IsEnabled(),
-		FragmenterEnabled:  d.fragmenter != nil && d.fragmenter.IsEnabled(),
-		UAHarmonizeEnabled: d.uaHarmonizer != nil && d.uaHarmonizer.IsEnabled(),
-		// For now we don't query the proxy for bandwidth limit, just setting it.
-	}
+	return d.privacyCfg
 }
 
 // SetPrivacyConfig dynamically enables/disables privacy features at runtime.
 func (d *Daemon) SetPrivacyConfig(cfg PrivacyConfig) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.privacyCfg = cfg
 	if d.ttlNormalizer != nil {
 		d.ttlNormalizer.SetEnabled(cfg.TTLEnabled)
 	}

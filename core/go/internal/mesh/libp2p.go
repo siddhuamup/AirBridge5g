@@ -230,6 +230,13 @@ func (s *LibP2PService) Stop(ctx context.Context) error {
 	s.cancel()
 	s.started = false
 
+	if s.udpConn != nil {
+		_ = s.udpConn.Close()
+	}
+	if s.tcpListener != nil {
+		_ = s.tcpListener.Close()
+	}
+
 	// Wait for goroutines with timeout
 	done := make(chan struct{})
 	go func() {
@@ -241,13 +248,6 @@ func (s *LibP2PService) Stop(ctx context.Context) error {
 	case <-done:
 	case <-ctx.Done():
 		return ctx.Err()
-	}
-
-	if s.udpConn != nil {
-		_ = s.udpConn.Close()
-	}
-	if s.tcpListener != nil {
-		_ = s.tcpListener.Close()
 	}
 
 	// Close all active peer connections
@@ -487,7 +487,7 @@ func (s *LibP2PService) natTraversalLoop() {
 	stunServer := "stun.l.google.com:19302"
 	
 	// Query immediately on startup, then every 5 minutes
-	s.performSTUNQuery(stunServer)
+	go s.performSTUNQuery(stunServer)
 	
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
@@ -497,18 +497,22 @@ func (s *LibP2PService) natTraversalLoop() {
 		case <-s.ctx.Done():
 			return
 		case <-ticker.C:
-			s.performSTUNQuery(stunServer)
+			go s.performSTUNQuery(stunServer)
 		}
 	}
 }
 
 func (s *LibP2PService) performSTUNQuery(stunServer string) {
-	conn, err := net.DialTimeout("udp", stunServer, 3*time.Second)
+	if s.ctx != nil && s.ctx.Err() != nil {
+		return
+	}
+	conn, err := net.DialTimeout("udp", stunServer, 1*time.Second)
 	if err != nil {
 		log.Printf("[airbridge-mesh] STUN dial failed: %v", err)
 		return
 	}
 	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(1 * time.Second))
 
 	c, err := stun.NewClient(conn)
 	if err != nil {
@@ -691,16 +695,16 @@ func (s *LibP2PService) gossipListenerLoop() {
 			return
 		}
 		
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
+			if s.ctx.Err() != nil {
+				return
+			}
 			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 				continue
 			}
-			if s.ctx.Err() == nil {
-				log.Printf("[airbridge-mesh] gossip read error: %v", err)
-			}
-			continue
+			return
 		}
 
 		var msg GossipMessage

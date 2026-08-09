@@ -94,3 +94,33 @@ func TestGRPCServer_GenerateAndImportQR(t *testing.T) {
 		t.Errorf("expected import success true, got false (error: %s)", impRes.ErrorMessage)
 	}
 }
+
+func TestGRPCServer_SetPrivacyConfig(t *testing.T) {
+	cfg := DefaultDaemonConfig()
+	daemon := NewDaemon(cfg, nil, nil, nil, nil, nil, nil, nil)
+	server := NewGRPCServer(daemon, "127.0.0.1:0")
+
+	ctx := context.Background()
+
+	res, err := server.SetPrivacyConfig(ctx, &controlv1.SetPrivacyConfigRequest{
+		DohEnabled:         true,
+		KillSwitchEnabled:  true,
+		TtlEnabled:         true,
+		FragmenterEnabled:  true,
+		UaHarmonizeEnabled: true,
+		BandwidthLimitKbps: 512,
+	})
+
+	if err != nil {
+		t.Fatalf("SetPrivacyConfig error: %v", err)
+	}
+
+	if !res.Success {
+		t.Error("expected SetPrivacyConfig success to be true")
+	}
+
+	pCfg := daemon.GetPrivacyConfig()
+	if pCfg.BandwidthLimitKbps != 512 {
+		t.Errorf("expected BandwidthLimitKbps 512, got %d", pCfg.BandwidthLimitKbps)
+	}
+}

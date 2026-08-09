@@ -44,6 +44,9 @@ class AirBridgeApp extends ConsumerWidget {
         supportedLocales: const [
           Locale('en', ''),
           Locale('mr', ''),
+          Locale('hi', ''),
+          Locale('es', ''),
+          Locale('de', ''),
         ],
         debugShowCheckedModeBanner: false,
         routerConfig: router,
@@ -72,6 +75,9 @@ class AirBridgeApp extends ConsumerWidget {
         supportedLocales: const [
           Locale('en', ''),
           Locale('mr', ''),
+          Locale('hi', ''),
+          Locale('es', ''),
+          Locale('de', ''),
         ],
         debugShowCheckedModeBanner: false,
         routerConfig: router,
@@ -91,6 +97,9 @@ class AirBridgeApp extends ConsumerWidget {
       supportedLocales: const [
         Locale('en', ''),
         Locale('mr', ''),
+        Locale('hi', ''),
+        Locale('es', ''),
+        Locale('de', ''),
       ],
       debugShowCheckedModeBanner: false,
       routerConfig: router,

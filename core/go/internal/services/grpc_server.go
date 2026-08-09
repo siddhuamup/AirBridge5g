@@ -283,7 +283,21 @@ func (s *GRPCServer) GetPrivacyStats(ctx context.Context, req *controlv1.GetPriv
 	}, nil
 }
 
-// SetPrivacyConfig is temporarily disabled due to protobuf mismatches.
+// SetPrivacyConfig dynamically updates the privacy engine configuration.
+func (s *GRPCServer) SetPrivacyConfig(ctx context.Context, req *controlv1.SetPrivacyConfigRequest) (*controlv1.SetPrivacyConfigResponse, error) {
+	s.daemon.SetPrivacyConfig(PrivacyConfig{
+		DoHEnabled:         req.DohEnabled,
+		KillSwitchEnabled:  req.KillSwitchEnabled,
+		TTLEnabled:         req.TtlEnabled,
+		FragmenterEnabled:  req.FragmenterEnabled,
+		UAHarmonizeEnabled: req.UaHarmonizeEnabled,
+		BandwidthLimitKbps: int(req.BandwidthLimitKbps),
+	})
+
+	return &controlv1.SetPrivacyConfigResponse{
+		Success: true,
+	}, nil
+}
 
 // ListPeers returns connected peer nodes.
 func (s *GRPCServer) ListPeers(ctx context.Context, req *controlv1.ListPeersRequest) (*controlv1.ListPeersResponse, error) {

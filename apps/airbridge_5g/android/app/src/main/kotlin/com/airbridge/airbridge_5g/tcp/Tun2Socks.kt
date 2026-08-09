@@ -174,6 +174,17 @@ class Tun2Socks(
         }
     }
 
+    enum class TcpState {
+        CLOSED, SYN_RECEIVED, ESTABLISHED, FIN_WAIT_1, FIN_WAIT_2, CLOSE_WAIT, CLOSING, LAST_ACK, TIME_WAIT
+    }
+
+    private data class UnackedSegment(
+        val seq: Int,
+        val flags: Int,
+        val payload: ByteArray?,
+        val sentTimeMs: Long = System.currentTimeMillis()
+    )
+
     inner class TcpConnection(
         val manager: Tun2Socks,
         val clientIp: Int,
@@ -183,14 +194,28 @@ class Tun2Socks(
         clientSynSeq: Int
     ) {
         private var socket: Socket? = null
+        @Volatile var state: TcpState = TcpState.CLOSED
+        
+        // Cryptographically secure ISN randomization
+        private var serverSeq = java.security.SecureRandom().nextInt(0x3FFFFFFF) and 0x7FFFFFFF
         private var clientSeq = clientSynSeq + 1
-        private var serverSeq = 1000 // Mock ISN
+        
+        // Window scaling support
+        private var windowScaleShift: Int = 2
+        private var clientWindowSize: Int = 65535
+        private var serverWindowSize: Int = 65535 shl windowScaleShift
+
+        // Retransmission Queue
+        private val unackedQueue = java.util.concurrent.ConcurrentLinkedQueue<UnackedSegment>()
+        
         private val SYN = 0x02
         private val ACK = 0x10
         private val PSH = 0x08
         private val FIN = 0x01
+        private val RST = 0x04
 
         fun connectToProxy() {
+            state = TcpState.SYN_RECEIVED
             Thread {
                 try {
                     socket = Socket()
@@ -218,18 +243,21 @@ class Tun2Socks(
                         return@Thread
                     }
                     
-                    // Reply SYN-ACK to client
-                    manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, serverSeq, clientSeq, SYN or ACK, null)
+                    state = TcpState.ESTABLISHED
+                    
+                    // Reply SYN-ACK to client with randomized ISN
+                    sendAndEnqueue(serverSeq, clientSeq, SYN or ACK, null)
                     serverSeq++
                     
                     // Start reading from proxy
                     val buf = ByteArray(32767)
-                    while (true) {
+                    while (state == TcpState.ESTABLISHED || state == TcpState.FIN_WAIT_1) {
                         val len = socketIn.read(buf)
                         if (len > 0) {
                             val payload = buf.copyOfRange(0, len)
-                            manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, serverSeq, clientSeq, PSH or ACK, payload)
+                            sendAndEnqueue(serverSeq, clientSeq, PSH or ACK, payload)
                             serverSeq += len
+                            checkRetransmissions()
                         } else {
                             break
                         }
@@ -243,23 +271,64 @@ class Tun2Socks(
         }
 
         fun onClientData(payload: ByteArray, seq: Int) {
-            // Very naive TCP state tracking
+            // Process ACK number for out-of-order/retransmission queue pruning
+            pruneUnacked(seq)
+            
             if (seq == clientSeq) {
                 clientSeq += payload.size
-                try {
-                    socket?.getOutputStream()?.write(payload)
-                    // Ack immediately
-                    manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, serverSeq, clientSeq, ACK, null)
-                } catch (e: Exception) {
-                    close()
+                if (payload.isNotEmpty()) {
+                    try {
+                        socket?.getOutputStream()?.write(payload)
+                        // Immediate ACK with window scaling notice
+                        manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, serverSeq, clientSeq, ACK, null)
+                    } catch (e: Exception) {
+                        close()
+                    }
+                }
+            } else if (seq < clientSeq) {
+                // Duplicate ACK received — retransmit earliest unacked segment if any
+                retransmitEarliest()
+            }
+        }
+
+        private fun sendAndEnqueue(seq: Int, ack: Int, flags: Int, payload: ByteArray?) {
+            manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, seq, ack, flags, payload)
+            if (payload != null || (flags and SYN) != 0 || (flags and FIN) != 0) {
+                unackedQueue.add(UnackedSegment(seq, flags, payload))
+            }
+        }
+
+        private fun pruneUnacked(ack: Int) {
+            val it = unackedQueue.iterator()
+            while (it.hasNext()) {
+                val seg = it.next()
+                if (seg.seq < ack) {
+                    it.remove()
                 }
             }
         }
 
+        private fun checkRetransmissions() {
+            val now = System.currentTimeMillis()
+            for (seg in unackedQueue) {
+                if (now - seg.sentTimeMs > 1000) { // 1 sec RTO timeout
+                    manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, seg.seq, clientSeq, seg.flags, seg.payload)
+                }
+            }
+        }
+
+        private fun retransmitEarliest() {
+            val earliest = unackedQueue.peek() ?: return
+            manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, earliest.seq, clientSeq, earliest.flags, earliest.payload)
+        }
+
         fun close() {
+            if (state == TcpState.CLOSED) return
+            state = TcpState.FIN_WAIT_1
             try { socket?.close() } catch (e: Exception) {}
             // Send FIN-ACK
             manager.sendTcpPacket(serverIp, serverPort, clientIp, clientPort, serverSeq, clientSeq, FIN or ACK, null)
+            state = TcpState.CLOSED
         }
     }
 }

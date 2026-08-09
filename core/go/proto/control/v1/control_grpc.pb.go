@@ -26,6 +26,7 @@ type ControlPlaneClient interface {
 	GetTrafficStats(ctx context.Context, in *GetTrafficStatsRequest, opts ...grpc.CallOption) (*GetTrafficStatsResponse, error)
 	StreamTrafficStats(ctx context.Context, in *StreamTrafficStatsRequest, opts ...grpc.CallOption) (ControlPlane_StreamTrafficStatsClient, error)
 	GetPrivacyStats(ctx context.Context, in *GetPrivacyStatsRequest, opts ...grpc.CallOption) (*GetPrivacyStatsResponse, error)
+	SetPrivacyConfig(ctx context.Context, in *SetPrivacyConfigRequest, opts ...grpc.CallOption) (*SetPrivacyConfigResponse, error)
 }
 
 type controlPlaneClient struct {
@@ -177,6 +178,15 @@ func (c *controlPlaneClient) GetPrivacyStats(ctx context.Context, in *GetPrivacy
 	return out, nil
 }
 
+func (c *controlPlaneClient) SetPrivacyConfig(ctx context.Context, in *SetPrivacyConfigRequest, opts ...grpc.CallOption) (*SetPrivacyConfigResponse, error) {
+	out := new(SetPrivacyConfigResponse)
+	err := c.cc.Invoke(ctx, "/airbridge.control.v1.ControlPlane/SetPrivacyConfig", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControlPlaneServer is the server API for ControlPlane service.
 type ControlPlaneServer interface {
 	GetStatus(context.Context, *GetStatusRequest) (*GetStatusResponse, error)
@@ -192,6 +202,7 @@ type ControlPlaneServer interface {
 	GetTrafficStats(context.Context, *GetTrafficStatsRequest) (*GetTrafficStatsResponse, error)
 	StreamTrafficStats(*StreamTrafficStatsRequest, ControlPlane_StreamTrafficStatsServer) error
 	GetPrivacyStats(context.Context, *GetPrivacyStatsRequest) (*GetPrivacyStatsResponse, error)
+	SetPrivacyConfig(context.Context, *SetPrivacyConfigRequest) (*SetPrivacyConfigResponse, error)
 }
 
 // UnimplementedControlPlaneServer can be embedded to have forward compatible implementations.
@@ -235,6 +246,9 @@ func (UnimplementedControlPlaneServer) StreamTrafficStats(*StreamTrafficStatsReq
 }
 func (UnimplementedControlPlaneServer) GetPrivacyStats(context.Context, *GetPrivacyStatsRequest) (*GetPrivacyStatsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPrivacyStats not implemented")
+}
+func (UnimplementedControlPlaneServer) SetPrivacyConfig(context.Context, *SetPrivacyConfigRequest) (*SetPrivacyConfigResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetPrivacyConfig not implemented")
 }
 
 type ControlPlane_StreamTrafficStatsServer interface {
@@ -305,6 +319,10 @@ var ControlPlane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPrivacyStats",
 			Handler:    _ControlPlane_GetPrivacyStats_Handler,
+		},
+		{
+			MethodName: "SetPrivacyConfig",
+			Handler:    _ControlPlane_SetPrivacyConfig_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -537,6 +555,24 @@ func _ControlPlane_GetPrivacyStats_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ControlPlaneServer).GetPrivacyStats(ctx, req.(*GetPrivacyStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControlPlane_SetPrivacyConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetPrivacyConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).SetPrivacyConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/airbridge.control.v1.ControlPlane/SetPrivacyConfig",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).SetPrivacyConfig(ctx, req.(*SetPrivacyConfigRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

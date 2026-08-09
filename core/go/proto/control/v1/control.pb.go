@@ -283,6 +283,25 @@ type GetPrivacyStatsRequest struct{}
 func (x *GetPrivacyStatsRequest) Reset()         { *x = GetPrivacyStatsRequest{} }
 func (x *GetPrivacyStatsRequest) String() string { return "GetPrivacyStatsRequest" }
 
+type SetPrivacyConfigRequest struct {
+	DohEnabled         bool   `protobuf:"varint,1,opt,name=doh_enabled,json=dohEnabled,proto3" json:"doh_enabled,omitempty"`
+	KillSwitchEnabled  bool   `protobuf:"varint,2,opt,name=kill_switch_enabled,json=killSwitchEnabled,proto3" json:"kill_switch_enabled,omitempty"`
+	TtlEnabled         bool   `protobuf:"varint,3,opt,name=ttl_enabled,json=ttlEnabled,proto3" json:"ttl_enabled,omitempty"`
+	FragmenterEnabled  bool   `protobuf:"varint,4,opt,name=fragmenter_enabled,json=fragmenterEnabled,proto3" json:"fragmenter_enabled,omitempty"`
+	UaHarmonizeEnabled bool   `protobuf:"varint,5,opt,name=ua_harmonize_enabled,json=uaHarmonizeEnabled,proto3" json:"ua_harmonize_enabled,omitempty"`
+	BandwidthLimitKbps uint32 `protobuf:"varint,6,opt,name=bandwidth_limit_kbps,json=bandwidthLimitKbps,proto3" json:"bandwidth_limit_kbps,omitempty"`
+}
+
+func (x *SetPrivacyConfigRequest) Reset()         { *x = SetPrivacyConfigRequest{} }
+func (x *SetPrivacyConfigRequest) String() string { return "SetPrivacyConfigRequest" }
+
+type SetPrivacyConfigResponse struct {
+	Success bool `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+}
+
+func (x *SetPrivacyConfigResponse) Reset()         { *x = SetPrivacyConfigResponse{} }
+func (x *SetPrivacyConfigResponse) String() string { return "SetPrivacyConfigResponse" }
+
 type GetPrivacyStatsResponse struct {
 	Ttl           *TTLNormalizationStats `protobuf:"bytes,1,opt,name=ttl,proto3" json:"ttl,omitempty"`
 	Fragmentation *FragmentationStats    `protobuf:"bytes,2,opt,name=fragmentation,proto3" json:"fragmentation,omitempty"`

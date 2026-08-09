@@ -36,16 +36,16 @@ func (s *LibP2PService) tcpListenerLoop() {
 	}
 
 	s.tcpListener = listener
+	if s.ctx.Err() != nil {
+		listener.Close()
+		return
+	}
 	log.Printf("[airbridge-mesh] TCP listener bound to %v", listener.Addr())
 
 	for {
 		conn, err := s.tcpListener.Accept()
 		if err != nil {
-			if s.ctx.Err() != nil {
-				return
-			}
-			log.Printf("[airbridge-mesh] tcp accept error: %v", err)
-			continue
+			return
 		}
 
 		go func(c net.Conn) {
