@@ -283,6 +283,8 @@ func (s *GRPCServer) GetPrivacyStats(ctx context.Context, req *controlv1.GetPriv
 	}, nil
 }
 
+// SetPrivacyConfig is temporarily disabled due to protobuf mismatches.
+
 // ListPeers returns connected peer nodes.
 func (s *GRPCServer) ListPeers(ctx context.Context, req *controlv1.ListPeersRequest) (*controlv1.ListPeersResponse, error) {
 	peers, err := s.daemon.ListPeers(ctx)

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -84,7 +85,7 @@ class OtaUpdateManager {
     return '';
   }
 
-  /// Opens the target URL in system default browser.
+  /// Opens the target URL in system default browser or DownloadManager.
   static Future<void> _launchDownloadUrl(String url) async {
     final targetUrl = url.isNotEmpty ? url : _fallbackUrl;
     try {
@@ -94,6 +95,9 @@ class OtaUpdateManager {
         await Process.run('open', [targetUrl]);
       } else if (Platform.isLinux) {
         await Process.run('xdg-open', [targetUrl]);
+      } else if (Platform.isAndroid) {
+        const platform = MethodChannel('com.airbridge/ota');
+        await platform.invokeMethod('downloadApk', {'url': targetUrl});
       } else {
         debugPrint('[OTA] Opening download URL: $targetUrl');
       }

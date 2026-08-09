@@ -13,7 +13,7 @@ class VpnMethodChannelHandler: NSObject {
         channel = FlutterMethodChannel(name: VpnMethodChannelHandler.channelName, binaryMessenger: messenger)
         super.init()
         channel.setMethodCallHandler(handle)
-        loadManager()
+        getManager { _ in }
     }
     
     private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -38,18 +38,32 @@ class VpnMethodChannelHandler: NSObject {
         }
     }
     
+    private var isLoadingManager = false
+    private var managerCompletions: [(NETunnelProviderManager) -> Void] = []
+    
     private func getManager(completion: @escaping (NETunnelProviderManager) -> Void) {
         if let mgr = manager {
             completion(mgr)
             return
         }
+        
+        managerCompletions.append(completion)
+        if isLoadingManager { return }
+        isLoadingManager = true
+        
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
+            guard let self = self else { return }
+            self.isLoadingManager = false
+            
             if let error = error {
                 NSLog("[AirBridge-iOS] Failed to load VPN managers: \(error)")
             }
             let mgr = managers?.first ?? NETunnelProviderManager()
-            self?.manager = mgr
-            completion(mgr)
+            self.manager = mgr
+            
+            let completions = self.managerCompletions
+            self.managerCompletions.removeAll()
+            completions.forEach { $0(mgr) }
         }
     }
     

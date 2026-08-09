@@ -5,6 +5,8 @@ import '../../providers/role_provider.dart';
 import '../../providers/daemon_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../services/ota_update.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// Settings screen — accessible from both Master and Client modes.
 /// Settings are now persisted via SharedPreferences.
@@ -16,28 +18,20 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  String _t(String key, String locale) {
-    const translations = {
-      'Settings': {'hi': 'सेटिंग्स', 'mr': 'सेटिंग्ज', 'es': 'Ajustes', 'fr': 'Paramètres', 'de': 'Einstellungen', 'ja': '設定', 'zh': '设置', 'ar': 'الإعدادات', 'pt': 'Configurações'},
-      'Appearance': {'hi': 'दिखावट', 'mr': 'दिसणे', 'es': 'Apariencia', 'fr': 'Apparence', 'de': 'Erscheinungsbild', 'ja': '外観', 'zh': '外观', 'ar': 'المظهر', 'pt': 'Aparência'},
-      'Network': {'hi': 'नेटवर्क', 'mr': 'नेटवर्क', 'es': 'Red', 'fr': 'Réseau', 'de': 'Netzwerk', 'ja': 'ネットワーク', 'zh': '网络', 'ar': 'الشبكة', 'pt': 'Rede'},
-      'Privacy Engine': {'hi': 'प्राइवेसी इंजन', 'mr': 'प्रायव्हसी इंजिन', 'es': 'Motor de Privacidad', 'fr': 'Moteur de Confidentialité', 'de': 'Datenschutz-Engine', 'ja': 'プライバシーエンジン', 'zh': '隐私引擎', 'ar': 'محرك الخصوصية', 'pt': 'Motor de Privacidade'},
-      'About': {'hi': 'के बारे में', 'mr': 'बद्दल', 'es': 'Acerca de', 'fr': 'À propos', 'de': 'Über', 'ja': '情報', 'zh': '关于', 'ar': 'حول', 'pt': 'Sobre'},
-      'Dark Mode': {'hi': 'डार्क मोड', 'mr': 'डार्क मोड', 'es': 'Modo Oscuro', 'fr': 'Mode Sombre', 'de': 'Dunkelmodus', 'ja': 'ダークモード', 'zh': '深色模式', 'ar': 'الوضع الداكن', 'pt': 'Modo Escuro'},
-      'Language': {'hi': 'भाषा', 'mr': 'भाषा', 'es': 'Idioma', 'fr': 'Langue', 'de': 'Sprache', 'ja': '言語', 'zh': '语言', 'ar': 'اللغة', 'pt': 'Idioma'},
-      'Encryption': {'hi': 'एन्क्रिप्शन', 'mr': 'एन्क्रिप्शन', 'es': 'Cifrado', 'fr': 'Chiffrement', 'de': 'Verschlüsselung', 'ja': '暗号化', 'zh': '加密', 'ar': 'التشفير', 'pt': 'Criptografia'},
-      'DNS Privacy': {'hi': 'डीएनएस गोपनीयता', 'mr': 'डीएनएस गोपनीयता', 'es': 'Privacidad DNS', 'fr': 'Confidentialité DNS', 'de': 'DNS-Datenschutz', 'ja': 'DNSプライバシー', 'zh': 'DNS隐私', 'ar': 'خصوصية DNS', 'pt': 'Privacidade DNS'},
-      'Kill Switch': {'hi': 'किल स्विच', 'mr': 'किल स्विच', 'es': 'Interruptor de Corte', 'fr': 'Kill Switch', 'de': 'Kill-Switch', 'ja': 'キルスイッチ', 'zh': '切断开关', 'ar': 'مفتاح الإيقاف', 'pt': 'Kill Switch'},
-      'Bandwidth Limit': {'hi': 'बैंडविड्थ सीमा', 'mr': 'बँडविड्थ मर्यादा', 'es': 'Límite de Ancho de Banda', 'fr': 'Limite de Bande Passante', 'de': 'Bandbreitenbegrenzung', 'ja': '帯域幅制限', 'zh': '带宽限制', 'ar': 'حد نطاق التردد', 'pt': 'Limite de Largura de Banda'},
-      'TTL Normalization': {'hi': 'टीटीएल समानीकरण', 'mr': 'टीटीएल नॉर्मलायझेशन', 'es': 'Normalización TTL', 'fr': 'Normalisation TTL', 'de': 'TTL-Normalisierung', 'ja': 'TTL正規化', 'zh': 'TTL标准化', 'ar': 'تطبيع TTL', 'pt': 'Normalização TTL'},
-      'DPI Resilience': {'hi': 'डीपीआई लचीलापन', 'mr': 'डीपीआय रेझिलियन्स', 'es': 'Resiliencia DPI', 'fr': 'Résilience DPI', 'de': 'DPI-Resilienz', 'ja': 'DPI耐性', 'zh': 'DPI抗性', 'ar': 'مرونة DPI', 'pt': 'Resiliência DPI'},
-      'User-Agent Harmonization': {'hi': 'यूज़र-एजेंट सामंजस्य', 'mr': 'युझर-एजंट सुसंगतता', 'es': 'Armonización User-Agent', 'fr': 'Harmonisation User-Agent', 'de': 'User-Agent-Harmonisierung', 'ja': 'User-Agent適合', 'zh': 'User-Agent谐调', 'ar': 'تنسيق وكيل المستخدم', 'pt': 'Harmonização de User-Agent'},
-      'QR Credentials': {'hi': 'क्यूआर क्रेडेंशियल', 'mr': 'क्यूआर क्रेडेंशियल', 'es': 'Credenciales QR', 'fr': 'Identifiants QR', 'de': 'QR-Anmeldedaten', 'ja': 'QR資格情報', 'zh': 'QR凭据', 'ar': 'بيانات اعتماد QR', 'pt': 'Credenciais QR'},
-      'Auto QR Rotation': {'hi': 'ऑटो क्यूआर रोटेशन', 'mr': 'ऑटो क्यूआर रोटेशन', 'es': 'Rotación Automática QR', 'fr': 'Rotation Auto des QR', 'de': 'Auto-QR-Rotation', 'ja': 'QR自動ローテーション', 'zh': 'QR自动轮换', 'ar': 'تدوير QR التلقائي', 'pt': 'Rotação Automática de QR'},
-      'Version': {'hi': 'संस्करण', 'mr': 'आवृत्ती', 'es': 'Versión', 'fr': 'Version', 'de': 'Version', 'ja': 'バージョン', 'zh': '版本', 'ar': 'الإصدار', 'pt': 'Versão'},
-      'Open Source Licenses': {'hi': 'ओपन सोर्स लाइसेंस', 'mr': 'ओपन सोर्स परवाने', 'es': 'Licencias de Código Abierto', 'fr': 'Licences Open Source', 'de': 'Open-Source-Lizenzen', 'ja': 'オープンソースライセンス', 'zh': '开源许可证', 'ar': 'تراخيص المصدر المفتوح', 'pt': 'Licenças de Código Aberto'},
-    };
-    return translations[key]?[locale] ?? key;
+  String _t(BuildContext context, String key) {
+    final loc = AppLocalizations.of(context);
+    if (loc == null) return key;
+    
+    switch (key) {
+      case 'Settings': return loc.settings;
+      case 'Appearance': return loc.theme;
+      case 'Language': return loc.language;
+      case 'DNS Privacy': return loc.dnsPrivacy;
+      case 'Kill Switch': return loc.killSwitch;
+      case 'Version': return loc.version;
+      case 'Dark Mode': return loc.darkMode;
+      default: return key;
+    }
   }
 
   Future<void> _syncDaemonPrivacy() async {
@@ -60,6 +54,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<void> _checkForUpdates() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final updateInfo = await OtaUpdateManager.checkForUpdate();
+    
+    if (mounted) Navigator.pop(context);
+    
+    if (updateInfo != null && mounted) {
+      OtaUpdateManager.showUpdateDialog(context, updateInfo);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You are on the latest version.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(roleProvider);
@@ -77,7 +91,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
-          _t('Settings', settings.locale),
+          _t(context, 'Settings'),
           style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
         ),
         iconTheme: IconThemeData(color: textColor),
@@ -86,13 +100,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         children: [
           // Appearance Section
-          _SectionHeader(title: _t('Appearance', settings.locale), color: textColor),
+          _SectionHeader(title: _t(context, 'Appearance'), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [
               _SettingsTile(
                 icon: Icons.dark_mode_rounded,
-                title: _t('Dark Mode', settings.locale),
+                title: _t(context, 'Dark Mode'),
                 subtitle: settings.darkMode ? 'Enabled' : 'Disabled',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -109,7 +123,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.language_rounded,
-                title: _t('Language', settings.locale),
+                title: _t(context, 'Language'),
                 subtitle: _languageName(settings.locale),
                 textColor: textColor,
                 accentColor: accentColor,
@@ -141,13 +155,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // Network Section
-          _SectionHeader(title: _t('Network', settings.locale), color: textColor),
+          _SectionHeader(title: _t(context, 'Network'), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [
               _SettingsTile(
                 icon: Icons.security_rounded,
-                title: _t('Encryption', settings.locale),
+                title: _t(context, 'Encryption'),
                 subtitle: 'TLS 1.3 + ChaCha20-Poly1305',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -155,7 +169,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.dns_rounded,
-                title: _t('DNS Privacy', settings.locale),
+                title: _t(context, 'DNS Privacy'),
                 subtitle: 'DNS-over-HTTPS (DoH)',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -171,7 +185,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.shield_rounded,
-                title: _t('Kill Switch', settings.locale),
+                title: _t(context, 'Kill Switch'),
                 subtitle: 'Block traffic on disconnect',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -187,7 +201,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.speed_rounded,
-                title: _t('Bandwidth Limit', settings.locale),
+                title: _t(context, 'Bandwidth Limit'),
                 subtitle: settings.bandwidthLimitKbps == 0
                     ? 'Unlimited'
                     : '${settings.bandwidthLimitKbps} Kbps',
@@ -220,13 +234,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // Privacy Section
-          _SectionHeader(title: _t('Privacy Engine', settings.locale), color: textColor),
+          _SectionHeader(title: _t(context, 'Privacy Engine'), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [
               _SettingsTile(
                 icon: Icons.fingerprint_rounded,
-                title: _t('TTL Normalization', settings.locale),
+                title: _t(context, 'TTL Normalization'),
                 subtitle: 'Target TTL: 64 (Mobile signature)',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -242,7 +256,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.broken_image_rounded,
-                title: _t('DPI Resilience', settings.locale),
+                title: _t(context, 'DPI Resilience'),
                 subtitle: 'Random packet fragmentation',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -258,7 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.phone_android_rounded,
-                title: _t('User-Agent Harmonization', settings.locale),
+                title: _t(context, 'User-Agent Harmonization'),
                 subtitle: 'Mask desktop traffic as mobile',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -277,13 +291,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // QR Section
-          _SectionHeader(title: _t('QR Credentials', settings.locale), color: textColor),
+          _SectionHeader(title: _t(context, 'QR Credentials'), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [
               _SettingsTile(
                 icon: Icons.qr_code_rounded,
-                title: _t('Auto QR Rotation', settings.locale),
+                title: _t(context, 'Auto QR Rotation'),
                 subtitle: 'Regenerate credentials every 24h',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -301,21 +315,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // About Section
-          _SectionHeader(title: _t('About', settings.locale), color: textColor),
+          _SectionHeader(title: _t(context, 'About'), color: textColor),
           _SettingsCard(
             cardColor: cardColor,
             children: [
               _SettingsTile(
                 icon: Icons.info_outline_rounded,
-                title: _t('Version', settings.locale),
-                subtitle: '1.0.0-alpha',
+                title: _t(context, 'Version'),
+                subtitle: '1.0.0+1',
                 textColor: textColor,
                 accentColor: accentColor,
+                onTap: _checkForUpdates,
+                trailing: Text(
+                  AppLocalizations.of(context)?.checkUpdates ?? 'Check for updates',
+                  style: TextStyle(
+                    color: accentColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               _Divider(color: textColor),
               _SettingsTile(
                 icon: Icons.code_rounded,
-                title: _t('Open Source Licenses', settings.locale),
+                title: _t(context, 'Open Source Licenses'),
                 subtitle: 'MIT, Apache 2.0, BSD',
                 textColor: textColor,
                 accentColor: accentColor,
@@ -393,6 +416,7 @@ class _SettingsTile extends StatelessWidget {
   final Color textColor;
   final Color accentColor;
   final Widget? trailing;
+  final VoidCallback? onTap;
 
   const _SettingsTile({
     required this.icon,
@@ -401,11 +425,14 @@ class _SettingsTile extends StatelessWidget {
     required this.textColor,
     required this.accentColor,
     this.trailing,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [

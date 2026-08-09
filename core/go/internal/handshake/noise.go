@@ -4,14 +4,24 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/example/securemesh/core/internal/protocol"
 	"github.com/flynn/noise"
+)
+
+type NoisePattern string
+type AEADSuite string
+
+const (
+	NoiseIK NoisePattern = "IK"
+	NoiseXX NoisePattern = "XX"
+
+	AEADAES256GCM  AEADSuite = "AES256-GCM"
+	AEADChaChaPoly AEADSuite = "ChaCha20-Poly1305"
 )
 
 type Config struct {
 	Initiator     bool
-	Pattern       protocol.NoisePattern
-	AEAD          protocol.AEADSuite
+	Pattern       NoisePattern
+	AEAD          AEADSuite
 	StaticKeypair noise.DHKey
 	PeerStatic    []byte
 	Prologue      []byte
@@ -21,11 +31,11 @@ func GenerateStaticKeypair() (noise.DHKey, error) {
 	return noise.DH25519.GenerateKeypair(rand.Reader)
 }
 
-func RecommendedPattern(peerStaticKnown bool) protocol.NoisePattern {
+func RecommendedPattern(peerStaticKnown bool) NoisePattern {
 	if peerStaticKnown {
-		return protocol.NoiseIK
+		return NoiseIK
 	}
-	return protocol.NoiseXX
+	return NoiseXX
 }
 
 func NewState(cfg Config) (*noise.HandshakeState, error) {
@@ -45,20 +55,20 @@ func NewState(cfg Config) (*noise.HandshakeState, error) {
 	})
 }
 
-func cipherSuite(aead protocol.AEADSuite) noise.CipherSuite {
+func cipherSuite(aead AEADSuite) noise.CipherSuite {
 	switch aead {
-	case protocol.AEADAES256GCM:
+	case AEADAES256GCM:
 		return noise.NewCipherSuite(noise.DH25519, noise.CipherAESGCM, noise.HashBLAKE2s)
 	default:
 		return noise.NewCipherSuite(noise.DH25519, noise.CipherChaChaPoly, noise.HashBLAKE2s)
 	}
 }
 
-func pattern(value protocol.NoisePattern) (noise.HandshakePattern, error) {
+func pattern(value NoisePattern) (noise.HandshakePattern, error) {
 	switch value {
-	case protocol.NoiseIK:
+	case NoiseIK:
 		return noise.HandshakeIK, nil
-	case protocol.NoiseXX:
+	case NoiseXX:
 		return noise.HandshakeXX, nil
 	default:
 		return noise.HandshakePattern{}, fmt.Errorf("unsupported Noise pattern %q", value)

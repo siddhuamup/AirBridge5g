@@ -92,49 +92,65 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     if (_target.isEmpty) _target = '8.8.8.8';
     _addLog('TRACEROUTE $_target ...');
 
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-      _addLog('Mobile socket hop probes:');
+    if (!kIsWeb && Platform.isAndroid) {
+      _addLog('Mobile traceroute to $_target:');
       try {
         final addrs = await InternetAddress.lookup(_target);
         final targetIp = addrs.first.address;
         
-        // Hop 1: Local gateway probe
+        for (int ttl = 1; ttl <= 15; ttl++) {
+          if (!mounted || !_running) break;
+          final sw = Stopwatch()..start();
+          try {
+            final result = await Process.run('ping', ['-c', '1', '-t', '$ttl', '-W', '1', targetIp]);
+            sw.stop();
+            
+            final out = result.stdout.toString();
+            if (out.contains('Time to live exceeded') || out.contains('TTL exceeded')) {
+              // Extract IP from "From 192.168.1.1 icmp_seq=1 Time to live exceeded"
+              final RegExp ipRegex = RegExp(r'From ([\d\.]+)');
+              final match = ipRegex.firstMatch(out);
+              final hopIp = match != null ? match.group(1) : '*';
+              _addLog('$ttl  $hopIp  ${sw.elapsedMilliseconds}ms');
+            } else if (out.contains('bytes from $targetIp')) {
+              _addLog('$ttl  $targetIp  ${sw.elapsedMilliseconds}ms (Target Reached)');
+              break;
+            } else {
+              _addLog('$ttl  *  *  Request timed out.');
+            }
+          } catch (e) {
+            _addLog('$ttl  *  *  Error: $e');
+          }
+        }
+      } catch (e) {
+        _addLog('ERROR: Traceroute failed - $e');
+      }
+    } else if (!kIsWeb && Platform.isIOS) {
+      _addLog('Mobile traceroute hop simulation to $_target ...');
+      // iOS doesn't allow Process.run('ping'), fallback to socket simulation
+      try {
+        final addrs = await InternetAddress.lookup(_target);
+        final targetIp = addrs.first.address;
+        
         final sw1 = Stopwatch()..start();
         try {
           final s1 = await Socket.connect('192.168.1.1', 80, timeout: const Duration(milliseconds: 600));
-          sw1.stop();
           s1.destroy();
-          _addLog('1  192.168.1.1  ${sw1.elapsedMilliseconds}ms (Local Gateway)');
+          _addLog('1  192.168.1.1  ${sw1.elapsedMilliseconds}ms');
         } catch (_) {
-          sw1.stop();
-          _addLog('1  192.168.1.1  ${sw1.elapsedMilliseconds > 0 ? sw1.elapsedMilliseconds : 1}ms (Local Gateway)');
+          _addLog('1  192.168.1.1  ${sw1.elapsedMilliseconds > 0 ? sw1.elapsedMilliseconds : 1}ms');
         }
-
-        // Hop 2: ISP / Edge probe
+        
         final sw2 = Stopwatch()..start();
         try {
-          final s2 = await Socket.connect('1.1.1.1', 53, timeout: const Duration(seconds: 1));
-          sw2.stop();
+          final s2 = await Socket.connect(targetIp, 80, timeout: const Duration(seconds: 2));
           s2.destroy();
-          _addLog('2  1.1.1.1     ${sw2.elapsedMilliseconds}ms (Cloudflare Edge)');
+          _addLog('2  $targetIp  ${sw2.elapsedMilliseconds}ms (Target Reached)');
         } catch (_) {
-          sw2.stop();
-          _addLog('2  1.1.1.1     ${sw2.elapsedMilliseconds}ms (DNS Edge)');
-        }
-
-        // Hop 3: Target host probe
-        final sw3 = Stopwatch()..start();
-        try {
-          final s3 = await Socket.connect(targetIp, 80, timeout: const Duration(seconds: 2));
-          sw3.stop();
-          s3.destroy();
-          _addLog('3  $targetIp  ${sw3.elapsedMilliseconds}ms (Target Reached)');
-        } catch (_) {
-          sw3.stop();
-          _addLog('3  $targetIp  ${sw3.elapsedMilliseconds}ms (Host Probed)');
+          _addLog('2  $targetIp  ${sw2.elapsedMilliseconds}ms (Host Probed)');
         }
       } catch (e) {
-        _addLog('ERROR: Mobile traceroute failed - $e');
+        _addLog('ERROR: iOS Traceroute failed - $e');
       }
     } else {
       try {

@@ -9,6 +9,8 @@ import 'providers/role_provider.dart';
 import 'providers/theme_provider.dart';
 import 'routing/app_router.dart';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'providers/settings_provider.dart';
 
 /// Root application widget for AirBridge 5G.
@@ -33,6 +35,16 @@ class AirBridgeApp extends ConsumerWidget {
       return fluent.FluentApp.router(
         title: 'AirBridge 5G',
         locale: appLocale,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en', ''),
+          Locale('mr', ''),
+        ],
         debugShowCheckedModeBanner: false,
         routerConfig: router,
         theme: fluent.FluentThemeData(
@@ -51,6 +63,16 @@ class AirBridgeApp extends ConsumerWidget {
       return CupertinoApp.router(
         title: 'AirBridge 5G',
         locale: appLocale,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en', ''),
+          Locale('mr', ''),
+        ],
         debugShowCheckedModeBanner: false,
         routerConfig: router,
         theme: _cupertinoTheme(role),
@@ -60,6 +82,16 @@ class AirBridgeApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'AirBridge 5G',
       locale: appLocale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en', ''),
+        Locale('mr', ''),
+      ],
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       themeMode: themeMode,

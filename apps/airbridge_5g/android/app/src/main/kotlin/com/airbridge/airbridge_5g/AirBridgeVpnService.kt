@@ -12,6 +12,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.net.InetSocketAddress
 import java.net.Socket
+import com.airbridge.airbridge_5g.tcp.Tun2Socks
 
 /**
  * AirBridge VPN Service — routes all device traffic through the SOCKS5 proxy
@@ -36,6 +37,7 @@ class AirBridgeVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var proxyHost: String = "127.0.0.1"
     private var proxyPort: Int = 1080
+    private var tun2Socks: Tun2Socks? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -103,77 +105,27 @@ class AirBridgeVpnService : VpnService() {
         val vpnFd = vpnInterface?.fileDescriptor ?: return
         val inputStream = ParcelFileDescriptor.AutoCloseInputStream(vpnInterface)
         val outputStream = ParcelFileDescriptor.AutoCloseOutputStream(vpnInterface)
-        val buffer = ByteArray(32767)
 
-        var relaySocket: Socket? = null
         try {
-            val socket = Socket()
-            protect(socket) // Bypass TUN interface to avoid loop
-            socket.connect(InetSocketAddress(proxyHost, proxyPort), 5000)
-            socket.soTimeout = 5000
-            
-            val out = socket.getOutputStream()
-            val socketIn = socket.getInputStream()
-
-            // 1. SOCKS5 Method Negotiation (VER=5, NMETHODS=1, METHOD=NO AUTH)
-            out.write(byteArrayOf(0x05, 0x01, 0x00))
-            out.flush()
-
-            val methodResp = ByteArray(2)
-            if (socketIn.read(methodResp) < 2 || methodResp[0] != 0x05.toByte()) {
-                throw IllegalStateException("SOCKS5 method negotiation failed")
-            }
-
-            // 2. SOCKS5 CONNECT Command (VER=5, CMD=1 CONNECT, RSV=0, ATYP=1 IPv4: 0.0.0.0:80)
-            val connectReq = byteArrayOf(
-                0x05, 0x01, 0x00, 0x01,
-                0x00, 0x00, 0x00, 0x00, // Destination IP 0.0.0.0
-                0x00, 0x50              // Destination Port 80
+            tun2Socks = Tun2Socks(
+                proxyHost = proxyHost,
+                proxyPort = proxyPort,
+                tunInputStream = inputStream,
+                tunOutputStream = outputStream,
+                protectSocket = { socket -> protect(socket) }
             )
-            out.write(connectReq)
-            out.flush()
-
-            val connectResp = ByteArray(10)
-            if (socketIn.read(connectResp) < 4 || connectResp[1] != 0x00.toByte()) {
-                Log.w(TAG, "SOCKS5 CONNECT reply code: ${connectResp[1]}")
-            }
-
-            socket.soTimeout = 0 // Clear handshake timeout for streaming
-            relaySocket = socket
-
-            // Background thread to relay incoming SOCKS data back to TUN outputStream
-            Thread {
-                val inBuf = ByteArray(32767)
-                try {
-                    while (isRunning && !socket.isClosed) {
-                        val len = socketIn.read(inBuf)
-                        if (len > 0) {
-                            outputStream.write(inBuf, 0, len)
-                            outputStream.flush()
-                        } else if (len < 0) break
-                    }
-                } catch (_: Exception) {}
-            }.start()
-
-            // Main loop to relay outgoing TUN inputStream data to SOCKS socket
-            while (isRunning && !socket.isClosed) {
-                val length = inputStream.read(buffer)
-                if (length > 0) {
-                    out.write(buffer, 0, length)
-                    out.flush()
-                } else if (length < 0) break
-            }
+            tun2Socks?.start()
         } catch (e: Exception) {
             if (isRunning) {
                 Log.e(TAG, "SOCKS5 relay tunnel error", e)
             }
-        } finally {
-            try { relaySocket?.close() } catch (_: Exception) {}
         }
     }
 
     private fun disconnect() {
         isRunning = false
+        tun2Socks?.stop()
+        tun2Socks = null
         try {
             vpnInterface?.close()
         } catch (e: Exception) {

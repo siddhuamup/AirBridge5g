@@ -40,6 +40,11 @@ dependencies:
   shared_preferences: ^2.2.3
   flutter_secure_storage: ^9.0.0
 
+  # i18n
+  intl: ^0.19.0
+  flutter_localizations:
+    sdk: flutter
+
   # Platform Utils
   package_info_plus: ^8.0.0
   device_info_plus: ^10.1.0
@@ -57,6 +62,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
 
   fonts:
     - family: Inter

@@ -153,6 +153,7 @@ type Server struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	wg       sync.WaitGroup
+	limiter  *RateLimiter
 }
 
 func (s *Server) GetConfig() ServerConfig {
@@ -168,6 +169,10 @@ func (s *Server) UpdatePrivacyConfig(dohEnabled, killSwitchEnabled bool) {
 	s.cfg.KillSwitchEnabled = killSwitchEnabled
 }
 
+func (s *Server) SetBandwidthLimit(bytesPerSec int64) {
+	s.limiter.SetRate(bytesPerSec)
+}
+
 // NewServer creates a new SOCKS5 proxy server.
 func NewServer(cfg ServerConfig) *Server {
 	if cfg.MaxConnections <= 0 {
@@ -179,7 +184,10 @@ func NewServer(cfg ServerConfig) *Server {
 	if cfg.RelayBufSize <= 0 {
 		cfg.RelayBufSize = 32 * 1024
 	}
-	return &Server{cfg: cfg}
+	return &Server{
+		cfg:     cfg,
+		limiter: NewRateLimiter(0),
+	}
 }
 
 // GetMetrics returns a snapshot of current server metrics.
@@ -613,9 +621,16 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 		if s.cfg.Fragmenter != nil {
 			dstWriter = &fragmentingWriter{w: target, fragmenter: s.cfg.Fragmenter}
 		}
+		if s.limiter.IsEnabled() {
+			dstWriter = NewRateLimitedWriter(dstWriter, s.limiter)
+		}
+
 		srcReader := io.Reader(client)
 		if s.cfg.UAHarmonizer != nil {
 			srcReader = &uaHarmonizingReader{r: client, uaHarmonizer: s.cfg.UAHarmonizer}
+		}
+		if s.limiter.IsEnabled() {
+			srcReader = NewRateLimitedReader(srcReader, s.limiter)
 		}
 		
 		buf := make([]byte, s.cfg.RelayBufSize)
@@ -652,12 +667,17 @@ func (s *Server) relay(ctx context.Context, client, target net.Conn) {
 			closeSockets()
 		}()
 		
+		var dstWriter io.Writer = client
+		if s.limiter.IsEnabled() {
+			dstWriter = NewRateLimitedWriter(dstWriter, s.limiter)
+		}
+
 		buf := make([]byte, s.cfg.RelayBufSize)
 		var total int64
 		for {
 			nr, err := target.Read(buf)
 			if nr > 0 {
-				nw, ew := client.Write(buf[:nr])
+				nw, ew := dstWriter.Write(buf[:nr])
 				if nw > 0 {
 					total += int64(nw)
 				}

@@ -13,6 +13,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/example/securemesh/core/internal/handshake"
+	"github.com/flynn/noise"
+	"github.com/pion/stun/v3"
 )
 
 // GossipMessage represents a peer discovery message sent over UDP.
@@ -112,6 +116,8 @@ type LibP2PService struct {
 	mu       sync.Mutex
 	started  bool
 	udpConn  *net.UDPConn
+	tcpListener net.Listener
+	noiseKeypair noise.DHKey
 }
 
 type connectedPeer struct {
@@ -143,10 +149,13 @@ func NewLibP2PService(cfg LibP2PConfig) (*LibP2PService, error) {
 		nodeID = hex.EncodeToString(pub[:16])
 	}
 
+	noiseKp, _ := handshake.GenerateStaticKeypair()
+
 	return &LibP2PService{
 		cfg:         cfg,
 		nodeID:      nodeID,
 		publicKey:   pubKey,
+		noiseKeypair: noiseKp,
 		peers:       make(map[string]*connectedPeer),
 		subscribers: make(map[string][]chan DiscoveryEvent),
 	}, nil
@@ -194,9 +203,17 @@ func (s *LibP2PService) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go s.gossipListenerLoop()
 
+	// Start TCP listener for mesh connections
+	s.wg.Add(1)
+	go s.tcpListenerLoop()
+
 	// Start GossipSub-like peer discovery exchange
 	s.wg.Add(1)
 	go s.gossipLoop()
+
+	// Start STUN-based NAT Traversal loop
+	s.wg.Add(1)
+	go s.natTraversalLoop()
 
 	return nil
 }
@@ -228,6 +245,9 @@ func (s *LibP2PService) Stop(ctx context.Context) error {
 
 	if s.udpConn != nil {
 		_ = s.udpConn.Close()
+	}
+	if s.tcpListener != nil {
+		_ = s.tcpListener.Close()
 	}
 
 	// Close all active peer connections
@@ -269,8 +289,25 @@ func (s *LibP2PService) Connect(ctx context.Context, peer PeerInfo) error {
 		for _, addr := range peer.Addrs {
 			conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
 			if err == nil {
-				activeConn = conn
-				break
+				if tcpConn, ok := conn.(*net.TCPConn); ok {
+					tcpConn.SetKeepAlive(true)
+					tcpConn.SetKeepAlivePeriod(30 * time.Second)
+				}
+				hCtx, hCancel := context.WithTimeout(ctx, 5*time.Second)
+				secure, err := handshake.UpgradeToSecure(hCtx, conn, handshake.Config{
+					Initiator:     true,
+					Pattern:       handshake.NoiseXX,
+					AEAD:          "ChaCha20-Poly1305",
+					StaticKeypair: s.noiseKeypair,
+				})
+				hCancel()
+				
+				if err == nil {
+					activeConn = secure
+					break
+				}
+				conn.Close()
+				log.Printf("[airbridge-mesh] peer %s noise handshake failed: %v", peer.ID, err)
 			}
 		}
 		if activeConn == nil {
@@ -403,6 +440,11 @@ func (s *LibP2PService) emitEvent(topic string, event DiscoveryEvent) {
 
 // peerHealthLoop periodically checks peer liveness.
 func (s *LibP2PService) peerHealthLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-mesh] panic recovered in peerHealthLoop: %v", r)
+		}
+	}()
 	defer s.wg.Done()
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -432,8 +474,88 @@ func (s *LibP2PService) peerHealthLoop() {
 	}
 }
 
+// natTraversalLoop periodically queries a STUN server to discover the node's public IP
+func (s *LibP2PService) natTraversalLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-mesh] panic recovered in natTraversalLoop: %v", r)
+		}
+	}()
+	defer s.wg.Done()
+	
+	// Default to Google's public STUN server
+	stunServer := "stun.l.google.com:19302"
+	
+	// Query immediately on startup, then every 5 minutes
+	s.performSTUNQuery(stunServer)
+	
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			s.performSTUNQuery(stunServer)
+		}
+	}
+}
+
+func (s *LibP2PService) performSTUNQuery(stunServer string) {
+	conn, err := net.DialTimeout("udp", stunServer, 3*time.Second)
+	if err != nil {
+		log.Printf("[airbridge-mesh] STUN dial failed: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	c, err := stun.NewClient(conn)
+	if err != nil {
+		log.Printf("[airbridge-mesh] STUN client creation failed: %v", err)
+		return
+	}
+	defer c.Close()
+
+	var xorAddr stun.XORMappedAddress
+	message := stun.MustBuild(stun.TransactionID, stun.BindingRequest)
+	
+	err = c.Do(message, func(res stun.Event) {
+		if res.Error != nil {
+			return
+		}
+		if getErr := xorAddr.GetFrom(res.Message); getErr != nil {
+			return
+		}
+		publicAddr := fmt.Sprintf("%s:%d", xorAddr.IP.String(), xorAddr.Port)
+		log.Printf("[airbridge-mesh] NAT Traversal successful. Public IP: %s", publicAddr)
+		
+		// Add this public IP to our known listen addresses so it's gossiped
+		found := false
+		for _, addr := range s.cfg.ListenAddrs {
+			if addr == publicAddr {
+				found = true
+				break
+			}
+		}
+		if !found {
+			s.cfg.ListenAddrs = append(s.cfg.ListenAddrs, publicAddr)
+			s.stats.NATTraversals.Add(1)
+		}
+	})
+	
+	if err != nil {
+		log.Printf("[airbridge-mesh] STUN query failed: %v", err)
+	}
+}
+
 // bootstrapLoop connects to bootstrap peers on startup.
 func (s *LibP2PService) bootstrapLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-mesh] panic recovered in bootstrapLoop: %v", r)
+		}
+	}()
 	defer s.wg.Done()
 
 	for _, addr := range s.cfg.Bootstrap {
@@ -462,6 +584,11 @@ func (s *LibP2PService) UpdatePeerLastSeen(peerID string) {
 
 // peerCountMetricsLoop monitors active peer metrics periodically.
 func (s *LibP2PService) peerCountMetricsLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-mesh] panic recovered in peerCountMetricsLoop: %v", r)
+		}
+	}()
 	defer s.wg.Done()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -481,6 +608,11 @@ func (s *LibP2PService) peerCountMetricsLoop() {
 
 // gossipLoop periodically shares known peers with all connected peers (GossipSub simulation).
 func (s *LibP2PService) gossipLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-mesh] panic recovered in gossipLoop: %v", r)
+		}
+	}()
 	defer s.wg.Done()
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -524,6 +656,11 @@ func (s *LibP2PService) gossipLoop() {
 
 // gossipListenerLoop listens for UDP gossip messages.
 func (s *LibP2PService) gossipListenerLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-mesh] panic recovered in gossipListenerLoop: %v", r)
+		}
+	}()
 	defer s.wg.Done()
 
 	if len(s.cfg.ListenAddrs) == 0 {

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/flynn/noise"
-	"github.com/example/securemesh/core/internal/protocol"
 )
 
 const (
@@ -264,11 +263,11 @@ func readFrame(conn net.Conn) ([]byte, error) {
 
 // WrapListener returns a net.Listener that upgrades all accepted connections
 // with a Noise handshake (responder side).
-func WrapListener(inner net.Listener, staticKey noise.DHKey, aead protocol.AEADSuite) *SecureListener {
+func WrapListener(inner net.Listener, staticKey noise.DHKey, aead string) *SecureListener {
 	return &SecureListener{
 		inner:     inner,
 		staticKey: staticKey,
-		aead:      aead,
+		aead:      AEADSuite(aead),
 	}
 }
 
@@ -276,7 +275,7 @@ func WrapListener(inner net.Listener, staticKey noise.DHKey, aead protocol.AEADS
 type SecureListener struct {
 	inner     net.Listener
 	staticKey noise.DHKey
-	aead      protocol.AEADSuite
+	aead      AEADSuite
 }
 
 // Accept waits for and returns the next connection, upgraded with Noise.
@@ -291,7 +290,7 @@ func (sl *SecureListener) Accept() (net.Conn, error) {
 
 	secure, err := UpgradeToSecure(ctx, conn, Config{
 		Initiator:     false,
-		Pattern:       protocol.NoiseXX,
+		Pattern:       NoiseXX,
 		AEAD:          sl.aead,
 		StaticKeypair: sl.staticKey,
 	})

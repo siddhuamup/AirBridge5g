@@ -10,6 +10,7 @@ import '../../providers/role_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/daemon_provider.dart';
 import '../../utils/crypto_utils.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'qr_rotation_countdown.dart';
 
 /// Master Dashboard — Dark Navy + Radiant Green theme.
@@ -141,8 +142,8 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                     _PulsingStatusDot(),
                     SizedBox(width: 10),
                     Text(
-                      'MASTER NODE',
-                      style: TextStyle(
+                      AppLocalizations.of(context)?.masterNode.toUpperCase() ?? 'MASTER NODE',
+                      style: const TextStyle(
                         color: AirBridgeColors.masterAccent,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -348,9 +349,9 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         children: [
           Row(
             children: [
-              const Text(
-                'Live Traffic',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context)?.liveTraffic ?? 'Live Traffic',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
@@ -472,9 +473,9 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         children: [
           Row(
             children: [
-              const Text(
-                'Connected Devices',
-                style: TextStyle(
+              Text(
+                AppLocalizations.of(context)?.connectedDevices ?? 'Connected Devices',
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,

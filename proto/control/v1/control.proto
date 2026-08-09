@@ -211,6 +211,7 @@ message SetPrivacyConfigRequest {
   bool ttl_enabled = 3;
   bool fragmenter_enabled = 4;
   bool ua_harmonize_enabled = 5;
+  uint32 bandwidth_limit_kbps = 6;
 }
 
 message SetPrivacyConfigResponse {

@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/example/securemesh/core/internal/protocol"
+	"github.com/quic-go/quic-go"
 )
 
 // QUIC transport constants.
@@ -80,25 +80,23 @@ func DefaultQUICConfig() QUICConfig {
 	}
 }
 
-// quicStream wraps a net.Conn-like stream to implement the Stream interface.
+// quicStream wraps a quic.Stream to implement the Stream interface.
 type quicStream struct {
-	conn    net.Conn
-	stats   *QUICStats
-	readBuf []byte
+	stream *quic.Stream
+	stats  *QUICStats
 }
 
-func newQUICStream(conn net.Conn, stats *QUICStats) *quicStream {
+func newQUICStream(stream *quic.Stream, stats *QUICStats) *quicStream {
 	return &quicStream{
-		conn:    conn,
-		stats:   stats,
-		readBuf: make([]byte, 64*1024), // 64KB read buffer
+		stream: stream,
+		stats:  stats,
 	}
 }
 
 func (s *quicStream) ReadPacket(ctx context.Context) ([]byte, error) {
 	// Read length-prefixed packet: [4 bytes length][payload]
 	lenBuf := make([]byte, 4)
-	if _, err := io.ReadFull(s.conn, lenBuf); err != nil {
+	if _, err := io.ReadFull(s.stream, lenBuf); err != nil {
 		return nil, fmt.Errorf("read packet length: %w", err)
 	}
 
@@ -108,7 +106,7 @@ func (s *quicStream) ReadPacket(ctx context.Context) ([]byte, error) {
 	}
 
 	payload := make([]byte, pktLen)
-	if _, err := io.ReadFull(s.conn, payload); err != nil {
+	if _, err := io.ReadFull(s.stream, payload); err != nil {
 		return nil, fmt.Errorf("read packet payload: %w", err)
 	}
 
@@ -125,7 +123,7 @@ func (s *quicStream) WritePacket(ctx context.Context, packet []byte) error {
 
 	// Write length prefix + payload atomically
 	data := append(lenBuf, packet...)
-	n, err := s.conn.Write(data)
+	n, err := s.stream.Write(data)
 	if err != nil {
 		return fmt.Errorf("write packet: %w", err)
 	}
@@ -134,18 +132,15 @@ func (s *quicStream) WritePacket(ctx context.Context, packet []byte) error {
 }
 
 func (s *quicStream) Close() error {
-	return s.conn.Close()
+	return s.stream.Close()
 }
 
 // QUICTransport implements the Dialer and Listener interfaces using QUIC.
-// This implementation uses TLS 1.3 over TCP as a QUIC-like transport layer.
-// When quic-go is added to go.mod, swap the underlying transport to real QUIC/UDP
-// while keeping the same interface contract.
 type QUICTransport struct {
 	TLSConfig *tls.Config
 	cfg       QUICConfig
 	stats     QUICStats
-	listener  net.Listener
+	listener  *quic.Listener
 	mu        sync.Mutex
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -176,25 +171,30 @@ func (t *QUICTransport) Dial(ctx context.Context, endpoint Endpoint, profile pro
 		return nil, errors.New("TLS config required for QUIC transport")
 	}
 
-	dialer := &tls.Dialer{
-		Config: t.TLSConfig,
+	quicCfg := &quic.Config{
+		HandshakeIdleTimeout: t.cfg.HandshakeTimeout,
+		MaxIdleTimeout:       t.cfg.IdleTimeout,
+		KeepAlivePeriod:      t.cfg.KeepAlive,
 	}
 
-	dialCtx, cancel := context.WithTimeout(ctx, t.cfg.HandshakeTimeout)
-	defer cancel()
-
-	conn, err := dialer.DialContext(dialCtx, "tcp", endpoint.Address)
+	conn, err := quic.DialAddr(ctx, endpoint.Address, t.TLSConfig, quicCfg)
 	if err != nil {
 		t.stats.HandshakeErrors.Add(1)
 		return nil, fmt.Errorf("quic dial %s: %w", endpoint.Address, err)
 	}
 
+	stream, err := conn.OpenStreamSync(ctx)
+	if err != nil {
+		conn.CloseWithError(1, err.Error())
+		return nil, fmt.Errorf("quic open stream: %w", err)
+	}
+
 	t.stats.TotalStreams.Add(1)
 	t.stats.ActiveStreams.Add(1)
 
-	stream := newQUICStream(conn, &t.stats)
+	qStream := newQUICStream(stream, &t.stats)
 	return &trackedStream{
-		Stream: stream,
+		Stream: qStream,
 		onClose: func() {
 			t.stats.ActiveStreams.Add(-1)
 		},
@@ -211,35 +211,16 @@ func (t *QUICTransport) Listen(ctx context.Context, profile protocol.SessionProf
 	t.ctx, t.cancel = context.WithCancel(ctx)
 	t.mu.Unlock()
 
-	var err error
-	t.listener, err = tls.Listen("tcp", t.cfg.BindAddress, t.TLSConfig)
-	if err != nil {
-		return nil, fmt.Errorf("quic listen on %s: %w", t.cfg.BindAddress, err)
+	quicCfg := &quic.Config{
+		HandshakeIdleTimeout: t.cfg.HandshakeTimeout,
+		MaxIdleTimeout:       t.cfg.IdleTimeout,
+		KeepAlivePeriod:      t.cfg.KeepAlive,
 	}
 
-	// Bind UDP socket for QUIC datagram packet listener
-	if udpAddr, err := net.ResolveUDPAddr("udp", t.cfg.BindAddress); err == nil {
-		if udpConn, err := net.ListenUDP("udp", udpAddr); err == nil {
-			log.Printf("[airbridge-quic] UDP datagram socket listening on %s", udpAddr)
-			go func() {
-				buf := make([]byte, 2048)
-				for {
-					t.mu.Lock()
-					canceled := t.ctx != nil && t.ctx.Err() != nil
-					t.mu.Unlock()
-					if canceled {
-						udpConn.Close()
-						return
-					}
-					udpConn.SetReadDeadline(time.Now().Add(2 * time.Second))
-					_, _, err := udpConn.ReadFromUDP(buf)
-					if err != nil && t.ctx != nil && t.ctx.Err() != nil {
-						udpConn.Close()
-						return
-					}
-				}
-			}()
-		}
+	var err error
+	t.listener, err = quic.ListenAddr(t.cfg.BindAddress, t.TLSConfig, quicCfg)
+	if err != nil {
+		return nil, fmt.Errorf("quic listen on %s: %w", t.cfg.BindAddress, err)
 	}
 
 	log.Printf("[airbridge-quic] listening on %s (ALPN=%s)", t.cfg.BindAddress, QUICALPNAirBridge)
@@ -251,38 +232,53 @@ func (t *QUICTransport) Listen(ctx context.Context, profile protocol.SessionProf
 		defer t.wg.Done()
 		defer close(t.streamCh)
 		for {
-			conn, err := t.listener.Accept()
+			conn, err := t.listener.Accept(t.ctx)
 			if err != nil {
 				if t.ctx.Err() != nil {
 					return // graceful shutdown
 				}
 				t.stats.HandshakeErrors.Add(1)
-				log.Printf("[airbridge-quic] accept error: %v", err)
+				log.Printf("[airbridge-quic] accept connection error: %v", err)
 				continue
 			}
 
-			if t.stats.ActiveStreams.Load() >= int64(t.cfg.MaxStreams) {
-				t.stats.StreamErrors.Add(1)
-				conn.Close()
-				continue
-			}
+			t.wg.Add(1)
+			go func(c *quic.Conn) {
+				defer t.wg.Done()
+				for {
+					stream, err := c.AcceptStream(t.ctx)
+					if err != nil {
+						if t.ctx.Err() == nil {
+							log.Printf("[airbridge-quic] accept stream error: %v", err)
+						}
+						return
+					}
 
-			t.stats.TotalStreams.Add(1)
-			t.stats.ActiveStreams.Add(1)
+					if t.stats.ActiveStreams.Load() >= int64(t.cfg.MaxStreams) {
+						t.stats.StreamErrors.Add(1)
+						stream.Close()
+						continue
+					}
 
-			stream := &trackedStream{
-				Stream: newQUICStream(conn, &t.stats),
-				onClose: func() {
-					t.stats.ActiveStreams.Add(-1)
-				},
-			}
+					t.stats.TotalStreams.Add(1)
+					t.stats.ActiveStreams.Add(1)
 
-			select {
-			case t.streamCh <- stream:
-			case <-t.ctx.Done():
-				stream.Close()
-				return
-			}
+					qStream := newQUICStream(stream, &t.stats)
+					tracked := &trackedStream{
+						Stream: qStream,
+						onClose: func() {
+							t.stats.ActiveStreams.Add(-1)
+						},
+					}
+
+					select {
+					case t.streamCh <- tracked:
+					case <-t.ctx.Done():
+						tracked.Close()
+						return
+					}
+				}
+			}(conn)
 		}
 	}()
 

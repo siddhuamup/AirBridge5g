@@ -400,12 +400,22 @@ func (d *Daemon) GenerateQRCredentials() (QRCredentials, error) {
 	if _, err := rand.Read(keyBytes); err != nil {
 		return QRCredentials{}, fmt.Errorf("generate encryption key: %w", err)
 	}
+	defer func() {
+		for i := range keyBytes {
+			keyBytes[i] = 0
+		}
+	}()
 
 	// Generate auth token
 	tokenBytes := make([]byte, 16)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return QRCredentials{}, fmt.Errorf("generate auth token: %w", err)
 	}
+	defer func() {
+		for i := range tokenBytes {
+			tokenBytes[i] = 0
+		}
+	}()
 
 	// Detect local IP for proxy address
 	proxyHost := detectLocalIP()
@@ -474,6 +484,11 @@ func (d *Daemon) GetPrivacyStats() PrivacyStats {
 
 // collectTrafficStats periodically snapshots traffic metrics.
 func (d *Daemon) collectTrafficStats() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-daemon] panic recovered in collectTrafficStats: %v", r)
+		}
+	}()
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -611,6 +626,7 @@ type PrivacyConfig struct {
 	TTLEnabled         bool `json:"ttl_enabled"`
 	FragmenterEnabled  bool `json:"fragmenter_enabled"`
 	UAHarmonizeEnabled bool `json:"ua_harmonize_enabled"`
+	BandwidthLimitKbps int  `json:"bandwidth_limit_kbps"`
 }
 
 // GetPrivacyConfig returns current privacy engine state.
@@ -623,6 +639,7 @@ func (d *Daemon) GetPrivacyConfig() PrivacyConfig {
 		TTLEnabled:         d.ttlNormalizer != nil && d.ttlNormalizer.IsEnabled(),
 		FragmenterEnabled:  d.fragmenter != nil && d.fragmenter.IsEnabled(),
 		UAHarmonizeEnabled: d.uaHarmonizer != nil && d.uaHarmonizer.IsEnabled(),
+		// For now we don't query the proxy for bandwidth limit, just setting it.
 	}
 }
 
@@ -641,7 +658,10 @@ func (d *Daemon) SetPrivacyConfig(cfg PrivacyConfig) {
 	}
 	if d.proxyServer != nil {
 		d.proxyServer.UpdatePrivacyConfig(cfg.DoHEnabled, cfg.KillSwitchEnabled)
+		// Convert Kbps to BytesPerSec
+		bytesPerSec := int64(cfg.BandwidthLimitKbps) * 1024 / 8
+		d.proxyServer.SetBandwidthLimit(bytesPerSec)
 	}
-	log.Printf("[airbridge-daemon] privacy config updated: DoH=%v KillSwitch=%v TTL=%v Frag=%v UA=%v",
-		cfg.DoHEnabled, cfg.KillSwitchEnabled, cfg.TTLEnabled, cfg.FragmenterEnabled, cfg.UAHarmonizeEnabled)
+	log.Printf("[airbridge-daemon] privacy config updated: DoH=%v KillSwitch=%v TTL=%v Frag=%v UA=%v BWLimit=%v Kbps",
+		cfg.DoHEnabled, cfg.KillSwitchEnabled, cfg.TTLEnabled, cfg.FragmenterEnabled, cfg.UAHarmonizeEnabled, cfg.BandwidthLimitKbps)
 }

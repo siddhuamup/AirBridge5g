@@ -8,6 +8,7 @@ import '../../providers/role_provider.dart';
 import '../../providers/daemon_provider.dart';
 import '../../services/platform_vpn.dart';
 import '../../utils/crypto_utils.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// Client Dashboard — Minimalist Sky Blue theme.
 /// Features QR scanner, one-click connect, and connection status.
@@ -268,7 +269,9 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _isConnected ? 'CONNECTED' : 'CLIENT MODE',
+                      _isConnected 
+                        ? (AppLocalizations.of(context)?.statusConnected.toUpperCase() ?? 'CONNECTED') 
+                        : (AppLocalizations.of(context)?.clientMode.toUpperCase() ?? 'CLIENT MODE'),
                       style: TextStyle(
                         color: _isConnected
                             ? AirBridgeColors.masterAccent
@@ -538,13 +541,13 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
               child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 28),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'One-Click Connect',
-                    style: TextStyle(
+                    AppLocalizations.of(context)?.oneClickConnect ?? 'One-Click Connect',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
