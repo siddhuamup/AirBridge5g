@@ -7,11 +7,13 @@ import (
 	"log"
 	"net"
 	"runtime"
+	"sync"
 	"time"
 
 	controlv1 "github.com/example/securemesh/core/proto/control/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -43,7 +45,8 @@ func (s *GRPCServer) Start(ctx context.Context) error {
 		return fmt.Errorf("listen gRPC tcp on %s: %w", s.addr, err)
 	}
 
-	s.server = grpc.NewServer()
+	limiter := newIPRateLimiter()
+	s.server = grpc.NewServer(grpc.UnaryInterceptor(rateLimitUnaryInterceptor(limiter)))
 	controlv1.RegisterControlPlaneServer(s.server, s)
 
 	log.Printf("[airbridge-grpc] gRPC server listening on %s", s.addr)
@@ -365,5 +368,71 @@ func mapProtoRole(role controlv1.NodeRole) NodeRole {
 		return RoleClient
 	default:
 		return RoleUnspecified
+	}
+}
+
+type ipRateLimiter struct {
+	mu       sync.Mutex
+	requests map[string][]time.Time
+}
+
+func newIPRateLimiter() *ipRateLimiter {
+	return &ipRateLimiter{
+		requests: make(map[string][]time.Time),
+	}
+}
+
+func (lim *ipRateLimiter) allow(ip string, limit int, window time.Duration) bool {
+	lim.mu.Lock()
+	defer lim.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-window)
+
+	timestamps := lim.requests[ip]
+	valid := timestamps[:0]
+	for _, t := range timestamps {
+		if t.After(cutoff) {
+			valid = append(valid, t)
+		}
+	}
+
+	if len(valid) >= limit {
+		lim.requests[ip] = valid
+		return false
+	}
+
+	lim.requests[ip] = append(valid, now)
+	return true
+}
+
+func rateLimitUnaryInterceptor(limiter *ipRateLimiter) grpc.UnaryServerInterceptor {
+	return func(
+		ctx context.Context,
+		req interface{},
+		info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler,
+	) (interface{}, error) {
+		ip := "127.0.0.1"
+		if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
+			host, _, err := net.SplitHostPort(p.Addr.String())
+			if err == nil {
+				ip = host
+			} else {
+				ip = p.Addr.String()
+			}
+		}
+
+		if info.FullMethod == "/airbridge.control.v1.ControlPlane/ImportQRCredentials" {
+			if !limiter.allow(ip+":import", 10, time.Minute) {
+				return nil, status.Errorf(codes.ResourceExhausted, "rate limit exceeded for ImportQRCredentials")
+			}
+		}
+
+		if !limiter.allow(ip+":general", 60, time.Minute) {
+			return nil, status.Errorf(codes.ResourceExhausted, "rate limit exceeded")
+		}
+
+		return handler(ctx, req)
 	}
 }

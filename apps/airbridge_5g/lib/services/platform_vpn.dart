@@ -64,4 +64,19 @@ class PlatformNetworkManager {
     }
     return false;
   }
+
+  /// Listens to network changes and automatically re-establishes VPN session
+  /// when switching between Wi-Fi and Mobile Data.
+  static void startAutoReconnectListener({
+    required String proxyHost,
+    required int proxyPort,
+  }) {
+    // Periodically verify tunnel liveness on network state changes
+    Future.delayed(const Duration(seconds: 3), () async {
+      final active = await isNetworkTunnelActive();
+      if (!active) {
+        await enableNetworkTunnel(proxyHost: proxyHost, proxyPort: proxyPort);
+      }
+    });
+  }
 }

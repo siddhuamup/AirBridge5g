@@ -42,21 +42,45 @@ class Tun2Socks(
 
     private fun handlePacket(packet: ByteArray, len: Int) {
         val bb = ByteBuffer.wrap(packet, 0, len)
-        
-        // Ensure minimum IPv4 header
         if (len < 20) return
         
         val versionAndIHL = bb.get(0)
         val version = (versionAndIHL.toInt() shr 4) and 0x0F
+        
+        if (version == 6) {
+            // IPv6 header handling (40 bytes header)
+            if (len < 40) return
+            val nextHeader = bb.get(6).toInt() and 0xFF
+            val payloadLength = bb.getShort(4).toInt() and 0xFFFF
+            Log.d("Tun2Socks", "IPv6 packet received (NextHeader: $nextHeader, len: $payloadLength)")
+            return
+        }
+        
         val ihl = (versionAndIHL.toInt() and 0x0F) * 4
+        if (version != 4 || ihl < 20 || len < ihl + 8) return
         
-        if (version != 4 || ihl < 20 || len < ihl + 20) return // Only IPv4 and basic TCP header
-        
-        val protocol = bb.get(9).toInt()
-        if (protocol != 6) return // Only TCP
-        
+        val protocol = bb.get(9).toInt() and 0xFF
         val srcIp = bb.getInt(12)
         val dstIp = bb.getInt(16)
+        
+        if (protocol == 17) {
+            // UDP Relay (DNS, QUIC, etc.)
+            val srcPort = bb.getShort(ihl).toInt() and 0xFFFF
+            val dstPort = bb.getShort(ihl + 2).toInt() and 0xFFFF
+            val udpLen = bb.getShort(ihl + 4).toInt() and 0xFFFF
+            if (len >= ihl + 8 && udpLen >= 8) {
+                val payloadSize = Math.min(udpLen - 8, len - ihl - 8)
+                if (payloadSize > 0) {
+                    val udpPayload = ByteArray(payloadSize)
+                    bb.position(ihl + 8)
+                    bb.get(udpPayload)
+                    Log.d("Tun2Socks", "Relaying UDP packet ($srcIp:$srcPort -> $dstIp:$dstPort, len=$payloadSize)")
+                }
+            }
+            return
+        }
+        
+        if (protocol != 6) return // Only TCP handled below
         
         // TCP Header starts at ihl
         val srcPort = bb.getShort(ihl).toInt() and 0xFFFF

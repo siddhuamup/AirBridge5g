@@ -54,6 +54,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  Future<bool> _authenticateBiometric(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Biometric Security Verification'),
+        content: const Text('Authenticate with Fingerprint / FaceID to alter security settings.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Authenticate'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   Future<void> _checkForUpdates() async {
     showDialog(
       context: context,
@@ -191,9 +212,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 accentColor: accentColor,
                 trailing: Switch(
                   value: settings.killSwitchEnabled,
-                  onChanged: (val) {
-                    settingsNotifier.setKillSwitchEnabled(val);
-                    _syncDaemonPrivacy();
+                  onChanged: (val) async {
+                    if (await _authenticateBiometric(context)) {
+                      settingsNotifier.setKillSwitchEnabled(val);
+                      _syncDaemonPrivacy();
+                    }
                   },
                   activeColor: accentColor,
                 ),

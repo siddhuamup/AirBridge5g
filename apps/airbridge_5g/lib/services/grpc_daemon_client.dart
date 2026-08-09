@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:crypto/crypto.dart';
 import 'package:grpc/grpc.dart';
 import 'daemon_client.dart';
 import '../providers/role_provider.dart' as app;
@@ -21,16 +22,34 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
   /// Base delay for exponential backoff (500ms → 1s → 2s).
   static const Duration _baseDelay = Duration(milliseconds: 500);
 
+  /// Expected SHA-256 certificate fingerprint pin for TLS pinning.
+  final String? pinnedCertSha256;
+
   GrpcDaemonClient({
     String host = '127.0.0.1',
     int port = 50051,
+    this.pinnedCertSha256,
   }) {
+    final credentials = (pinnedCertSha256 != null && pinnedCertSha256!.isNotEmpty)
+        ? ChannelCredentials.secure(
+            onBadCertificate: (cert, host) {
+              // Verify SHA-256 certificate fingerprint
+              final der = cert.der;
+              final hashBytes = sha256.convert(der).bytes;
+              final hashHex = hashBytes
+                  .map((b) => b.toRadixString(16).padLeft(2, '0'))
+                  .join();
+              return hashHex.toLowerCase() == pinnedCertSha256!.toLowerCase();
+            },
+          )
+        : const ChannelCredentials.insecure();
+
     _channel = ClientChannel(
       host,
       port: port,
-      options: const ChannelOptions(
-        credentials: ChannelCredentials.insecure(),
-        idleTimeout: Duration(minutes: 5),
+      options: ChannelOptions(
+        credentials: credentials,
+        idleTimeout: const Duration(minutes: 5),
       ),
     );
     _client = pbgrpc.ControlPlaneClient(_channel);

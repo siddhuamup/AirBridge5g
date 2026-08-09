@@ -173,8 +173,9 @@ func (d *Daemon) Start(ctx context.Context) error {
 		}
 	}
 
-	// Start traffic stats collection
+	// Start traffic stats collection & token auto-rotation
 	go d.collectTrafficStats()
+	go d.startTokenRotationLoop()
 
 	log.Printf("[airbridge-daemon] started (node=%s, platform=%s)", d.cfg.NodeID, runtime.GOOS)
 	return nil
@@ -531,6 +532,30 @@ func (d *Daemon) collectTrafficStats() {
 				d.trafficHistory = d.trafficHistory[len(d.trafficHistory)-d.maxHistory:]
 			}
 			d.historyMu.Unlock()
+		}
+	}
+}
+
+// startTokenRotationLoop periodically auto-rotates session credentials every 23h.
+func (d *Daemon) startTokenRotationLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[airbridge-daemon] panic recovered in startTokenRotationLoop: %v", r)
+		}
+	}()
+	ticker := time.NewTicker(23 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-d.ctx.Done():
+			return
+		case <-ticker.C:
+			log.Println("[airbridge-daemon] auto-rotating session credentials (23h interval)...")
+			_, err := d.GenerateQRCredentials()
+			if err != nil {
+				log.Printf("[airbridge-daemon] token auto-rotation failed: %v", err)
+			}
 		}
 	}
 }

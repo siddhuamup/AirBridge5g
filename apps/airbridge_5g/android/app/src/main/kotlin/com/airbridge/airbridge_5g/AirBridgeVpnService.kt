@@ -82,6 +82,16 @@ class AirBridgeVpnService : VpnService() {
             // Exclude our own app from the VPN to prevent loops
             builder.addDisallowedApplication(packageName)
 
+            // Split Tunneling support — exclude specified package names (e.g. banking apps)
+            val disallowedApps = arrayOf("com.example.bankapp", "com.example.sensitiveapp")
+            disallowedApps.forEach { pkg ->
+                try {
+                    builder.addDisallowedApplication(pkg)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Split tunneling: excluded app $pkg not installed")
+                }
+            }
+
             vpnInterface = builder.establish()
             isRunning = true
 

@@ -17,6 +17,10 @@ import NetworkExtension
         (call: FlutterMethodCall, result: @escaping FlutterResult) -> Void in
         switch call.method {
         case "startVpn":
+          if self.isJailbroken() {
+            result(FlutterError(code: "SECURITY_VIOLATION", message: "Jailbroken iOS device detected. VPN operation disabled for security.", details: nil))
+            return
+          }
           let args = call.arguments as? [String: Any]
           let proxyHost = args?["proxy_host"] as? String ?? "127.0.0.1"
           let proxyPort = args?["proxy_port"] as? Int ?? 1080
@@ -73,5 +77,22 @@ import NetworkExtension
 
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func isJailbroken() -> Bool {
+    let paths = [
+      "/Applications/Cydia.app",
+      "/Library/MobileSubstrate/MobileSubstrate.dylib",
+      "/bin/bash",
+      "/usr/sbin/sshd",
+      "/etc/apt",
+      "/private/var/lib/apt/"
+    ]
+    for path in paths {
+      if FileManager.default.fileExists(atPath: path) {
+        return true
+      }
+    }
+    return false
   }
 }
