@@ -69,9 +69,21 @@ class AirBridgeCrypto {
   /// Sanitizes proxy endpoint strings to prevent injection.
   static String sanitizeEndpoint(String rawEndpoint) {
     final trimmed = rawEndpoint.trim();
+    if (trimmed.isEmpty) return '127.0.0.1:1080';
+
+    if (trimmed.startsWith('[')) {
+      final closingBracket = trimmed.indexOf(']');
+      if (closingBracket != -1) {
+        final host = trimmed.substring(0, closingBracket + 1);
+        int port = 1080;
+        if (closingBracket + 1 < trimmed.length && trimmed[closingBracket + 1] == ':') {
+          port = int.tryParse(trimmed.substring(closingBracket + 2)) ?? 1080;
+        }
+        return '$host:$port';
+      }
+    }
+
     final parts = trimmed.split(':');
-    if (parts.isEmpty) return '127.0.0.1:1080';
-    
     final host = parts[0];
     int port = 1080;
     if (parts.length > 1) {

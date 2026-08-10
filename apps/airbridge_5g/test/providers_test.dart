@@ -6,11 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('RoleProvider', () {
-    test('initial state is neutral', () {
+    test('initial state is unspecified', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       
-      expect(container.read(roleProvider), NodeRole.neutral);
+      expect(container.read(roleProvider), NodeRole.unspecified);
     });
 
     test('can set role to master', () {
@@ -21,7 +21,7 @@ void main() {
       expect(container.read(roleProvider), NodeRole.master);
     });
 
-    test('can clear role to neutral', () {
+    test('can clear role to unspecified', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
       
@@ -29,7 +29,7 @@ void main() {
       expect(container.read(roleProvider), NodeRole.client);
 
       container.read(roleProvider.notifier).clearRole();
-      expect(container.read(roleProvider), NodeRole.neutral);
+      expect(container.read(roleProvider), NodeRole.unspecified);
     });
   });
 
@@ -48,8 +48,8 @@ void main() {
       addTearDown(container.dispose);
 
       final settings = container.read(settingsProvider);
-      expect(settings.darkMode, false);
-      expect(settings.dohEnabled, false);
+      expect(settings.darkMode, true);
+      expect(settings.dohEnabled, true);
       expect(settings.killSwitchEnabled, true);
     });
 
@@ -62,8 +62,8 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      container.read(settingsProvider.notifier).setDarkMode(true);
-      expect(container.read(settingsProvider).darkMode, true);
+      container.read(settingsProvider.notifier).setDarkMode(false);
+      expect(container.read(settingsProvider).darkMode, false);
     });
   });
 }
