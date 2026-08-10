@@ -49,6 +49,10 @@ class ControlPlaneClient extends $grpc.Client {
       '/airbridge.control.v1.ControlPlane/ListPeers',
       ($0.ListPeersRequest value) => value.writeToBuffer(),
       ($core.List<$core.int> value) => $0.ListPeersResponse.fromBuffer(value));
+  static final _$setPrivacyConfig = $grpc.ClientMethod<$0.SetPrivacyConfigRequest, $0.SetPrivacyConfigResponse>(
+      '/airbridge.control.v1.ControlPlane/SetPrivacyConfig',
+      ($0.SetPrivacyConfigRequest value) => value.writeToBuffer(),
+      ($core.List<$core.int> value) => $0.SetPrivacyConfigResponse.fromBuffer(value));
 
   ControlPlaneClient($grpc.ClientChannel channel, {$grpc.CallOptions? options, $core.Iterable<$grpc.ClientInterceptor>? interceptors})
       : super(channel, options: options, interceptors: interceptors);
@@ -79,5 +83,9 @@ class ControlPlaneClient extends $grpc.Client {
 
   $grpc.ResponseFuture<$0.ListPeersResponse> listPeers($0.ListPeersRequest request, {$grpc.CallOptions? options}) {
     return $createUnaryCall(_$listPeers, request, options: options);
+  }
+
+  $grpc.ResponseFuture<$0.SetPrivacyConfigResponse> setPrivacyConfig($0.SetPrivacyConfigRequest request, {$grpc.CallOptions? options}) {
+    return $createUnaryCall(_$setPrivacyConfig, request, options: options);
   }
 }

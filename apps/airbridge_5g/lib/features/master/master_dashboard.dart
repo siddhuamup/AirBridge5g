@@ -45,10 +45,12 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
     final client = ref.read(daemonProvider);
     _trafficSub = client.streamTrafficStats().listen((data) {
       if (mounted) {
-        ref.read(trafficDataProvider.notifier).addDataPoint(
-          (data['throughput_out_bps'] as num?)?.toDouble() ?? 0.0,  // download
-          (data['throughput_in_bps'] as num?)?.toDouble() ?? 0.0,   // upload
-        );
+        Future.microtask(() {
+          ref.read(trafficDataProvider.notifier).addDataPoint(
+            (data['throughput_out_bps'] as num?)?.toDouble() ?? 0.0,  // download
+            (data['throughput_in_bps'] as num?)?.toDouble() ?? 0.0,   // upload
+          );
+        });
       }
     });
     
@@ -63,8 +65,10 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
       final peers = await client.getConnectedPeers();
       final status = await client.getStatus();
       if (status.startedAtUnixMs > 0) {
-        ref.read(sessionStartTimeProvider.notifier).state =
-            DateTime.fromMillisecondsSinceEpoch(status.startedAtUnixMs);
+        Future.microtask(() {
+          ref.read(sessionStartTimeProvider.notifier).state =
+              DateTime.fromMillisecondsSinceEpoch(status.startedAtUnixMs);
+        });
       }
       if (mounted) {
         setState(() {
@@ -137,7 +141,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                     context.go('/');
                   },
                 ),
-                title: const Row(
+                title: Row(
                   children: [
                     _PulsingStatusDot(),
                     SizedBox(width: 10),
@@ -257,7 +261,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         color: AirBridgeColors.masterSurface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AirBridgeColors.masterAccent.withValues(alpha: 0.15),
+          color: AirBridgeColors.masterAccent.withOpacity(0.15),
         ),
       ),
       child: Column(
@@ -274,7 +278,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
           Text(
             'Share this QR code with clients',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: Colors.white.withOpacity(0.5),
               fontSize: 13,
             ),
           ),
@@ -294,7 +298,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: AirBridgeColors.masterAccent.withValues(alpha: 0.2),
+                      color: AirBridgeColors.masterAccent.withOpacity(0.2),
                       blurRadius: 30,
                       spreadRadius: 5,
                     ),
@@ -305,11 +309,11 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                   version: QrVersions.auto,
                   size: 180,
                   eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.roundedRect,
+                    eyeShape: QrEyeShape.square,
                     color: Color(0xFF0A1628),
                   ),
                   dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.roundedRect,
+                    dataModuleShape: QrDataModuleShape.square,
                     color: Color(0xFF0A1628),
                   ),
                 ),
@@ -341,7 +345,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         color: AirBridgeColors.masterSurface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AirBridgeColors.masterAccent.withValues(alpha: 0.15),
+          color: AirBridgeColors.masterAccent.withOpacity(0.15),
         ),
       ),
       child: Column(
@@ -369,7 +373,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                 ? Center(
                     child: Text(
                       'Waiting for traffic...',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                      style: TextStyle(color: Colors.white.withOpacity(0.3)),
                     ),
                   )
                 : LineChart(
@@ -379,7 +383,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                         drawVerticalLine: false,
                         horizontalInterval: 25e6,
                         getDrawingHorizontalLine: (value) => FlLine(
-                          color: Colors.white.withValues(alpha: 0.05),
+                          color: Colors.white.withOpacity(0.05),
                           strokeWidth: 1,
                         ),
                       ),
@@ -396,7 +400,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                               return Text(
                                 '${(value / 1e6).toStringAsFixed(0)}M',
                                 style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.3),
+                                  color: Colors.white.withOpacity(0.3),
                                   fontSize: 10,
                                 ),
                               );
@@ -422,7 +426,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                           dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: AirBridgeColors.masterAccent.withValues(alpha: 0.1),
+                            color: AirBridgeColors.masterAccent.withOpacity(0.1),
                           ),
                         ),
                         // Download line
@@ -439,7 +443,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                           dotData: const FlDotData(show: false),
                           belowBarData: BarAreaData(
                             show: true,
-                            color: const Color(0xFF40C4FF).withValues(alpha: 0.1),
+                            color: const Color(0xFF40C4FF).withOpacity(0.1),
                           ),
                         ),
                       ],
@@ -465,7 +469,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
         color: AirBridgeColors.masterSurface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AirBridgeColors.masterAccent.withValues(alpha: 0.15),
+          color: AirBridgeColors.masterAccent.withOpacity(0.15),
         ),
       ),
       child: Column(
@@ -504,7 +508,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
                     child: Text(
                       'No connected peers. Share QR code above to connect devices.',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: Colors.white.withOpacity(0.5),
                         fontSize: 14,
                       ),
                     ),
@@ -551,7 +555,7 @@ class _MasterDashboardState extends ConsumerState<MasterDashboard>
       decoration: BoxDecoration(
         color: AirBridgeColors.masterSurface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -627,7 +631,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AirBridgeColors.masterSurface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
+        border: Border.all(color: color.withOpacity(0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -647,7 +651,7 @@ class _StatCard extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
+              color: Colors.white.withOpacity(0.4),
               fontSize: 10,
               letterSpacing: 1,
             ),
@@ -680,7 +684,7 @@ class _LegendDot extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
+            color: Colors.white.withOpacity(0.5),
             fontSize: 11,
           ),
         ),
@@ -715,7 +719,7 @@ class _DeviceRow extends StatelessWidget {
           height: 42,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            color: color.withValues(alpha: 0.1),
+            color: color.withOpacity(0.1),
           ),
           child: Icon(icon, color: color, size: 22),
         ),
@@ -735,7 +739,7 @@ class _DeviceRow extends StatelessWidget {
               Text(
                 platform,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: Colors.white.withOpacity(0.4),
                   fontSize: 12,
                 ),
               ),
@@ -748,7 +752,7 @@ class _DeviceRow extends StatelessWidget {
             Text(
               bytesUsed,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withOpacity(0.7),
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
@@ -756,7 +760,7 @@ class _DeviceRow extends StatelessWidget {
             Text(
               latency,
               style: TextStyle(
-                color: AirBridgeColors.masterAccent.withValues(alpha: 0.7),
+                color: AirBridgeColors.masterAccent.withOpacity(0.7),
                 fontSize: 11,
               ),
             ),
@@ -810,7 +814,7 @@ class _PulsingStatusDotState extends State<_PulsingStatusDot>
                 height: 12,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AirBridgeColors.masterAccent.withValues(alpha: opacity),
+                  color: AirBridgeColors.masterAccent.withOpacity(opacity),
                 ),
               ),
             ),
@@ -862,7 +866,7 @@ class _PrivacySwitch extends StatelessWidget {
               Text(
                 subtitle,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Colors.white.withOpacity(0.5),
                   fontSize: 12,
                 ),
               ),

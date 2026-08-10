@@ -419,7 +419,7 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
-          color: color.withValues(alpha: 0.5),
+          color: color.withOpacity(0.5),
           fontSize: 12,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.5,
@@ -479,7 +479,7 @@ class _SettingsTile extends StatelessWidget {
             height: 36,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              color: accentColor.withValues(alpha: 0.1),
+              color: accentColor.withOpacity(0.1),
             ),
             child: Icon(icon, color: accentColor, size: 18),
           ),
@@ -500,7 +500,7 @@ class _SettingsTile extends StatelessWidget {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: textColor.withValues(alpha: 0.5),
+                    color: textColor.withOpacity(0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -510,6 +510,7 @@ class _SettingsTile extends StatelessWidget {
           if (trailing != null) trailing!,
         ],
       ),
+    ),
     );
   }
 }
@@ -525,7 +526,7 @@ class _Divider extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Divider(
         height: 1,
-        color: color.withValues(alpha: 0.08),
+        color: color.withOpacity(0.08),
       ),
     );
   }

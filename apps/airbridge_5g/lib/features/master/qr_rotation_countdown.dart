@@ -34,7 +34,9 @@ class _QrRotationCountdownState extends ConsumerState<QrRotationCountdown> {
     if (expiresAt == null) {
       // Set initial expiry to 24h from now
       final newExpiry = DateTime.now().add(const Duration(hours: 24));
-      ref.read(qrExpiresAtProvider.notifier).state = newExpiry;
+      Future.microtask(() {
+        ref.read(qrExpiresAtProvider.notifier).state = newExpiry;
+      });
     }
 
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -60,7 +62,9 @@ class _QrRotationCountdownState extends ConsumerState<QrRotationCountdown> {
   Future<void> _rotateQr() async {
     // Set new expiry
     final newExpiry = DateTime.now().add(const Duration(hours: 24));
-    ref.read(qrExpiresAtProvider.notifier).state = newExpiry;
+    Future.microtask(() {
+      ref.read(qrExpiresAtProvider.notifier).state = newExpiry;
+    });
 
     // Trigger regeneration callback
     widget.onRotate();
@@ -89,7 +93,7 @@ class _QrRotationCountdownState extends ConsumerState<QrRotationCountdown> {
         color: AirBridgeColors.masterSurface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AirBridgeColors.masterAccent.withValues(alpha: 0.15),
+          color: AirBridgeColors.masterAccent.withOpacity(0.15),
         ),
       ),
       child: Row(
@@ -104,7 +108,7 @@ class _QrRotationCountdownState extends ConsumerState<QrRotationCountdown> {
               color: _remaining.inMinutes < 30
                   ? AirBridgeColors.masterError
                   : AirBridgeColors.masterAccent,
-              backgroundColor: Colors.white.withValues(alpha: 0.1),
+              backgroundColor: Colors.white.withOpacity(0.1),
             ),
           ),
           const SizedBox(width: 10),
@@ -115,7 +119,7 @@ class _QrRotationCountdownState extends ConsumerState<QrRotationCountdown> {
               Text(
                 'QR Valid For',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Colors.white.withOpacity(0.5),
                   fontSize: 10,
                   letterSpacing: 0.5,
                 ),
@@ -139,7 +143,7 @@ class _QrRotationCountdownState extends ConsumerState<QrRotationCountdown> {
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: AirBridgeColors.masterAccent.withValues(alpha: 0.1),
+                color: AirBridgeColors.masterAccent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(

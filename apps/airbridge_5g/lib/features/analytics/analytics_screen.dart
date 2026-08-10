@@ -72,14 +72,16 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
       trafficList[trafficList.length - 1] = (mbIn + mbOut).clamp(0.1, 100.0);
 
-      ref.read(usageStatsProvider.notifier).state = UsageStats(
-        totalBytesIn: snapshot.bytesIn,
-        totalBytesOut: snapshot.bytesOut,
-        totalConnections: snapshot.activeConnections.toInt(),
-        peakPeers: peers.length > current.peakPeers ? peers.length : (current.peakPeers > 0 ? current.peakPeers : peers.length),
-        totalUptime: Duration(seconds: uptimeSec > 0 ? uptimeSec : 0),
-        hourlyTraffic: trafficList,
-      );
+      Future.microtask(() {
+        ref.read(usageStatsProvider.notifier).state = UsageStats(
+          totalBytesIn: snapshot.bytesIn,
+          totalBytesOut: snapshot.bytesOut,
+          totalConnections: snapshot.activeConnections.toInt(),
+          peakPeers: peers.length > current.peakPeers ? peers.length : (current.peakPeers > 0 ? current.peakPeers : peers.length),
+          totalUptime: Duration(seconds: uptimeSec > 0 ? uptimeSec : 0),
+          hourlyTraffic: trafficList,
+        );
+      });
     } catch (_) {}
   }
 
@@ -177,7 +179,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           Text(
             'HOURLY TRAFFIC (24H)',
             style: TextStyle(
-              color: textColor.withValues(alpha: 0.5),
+              color: textColor.withOpacity(0.5),
               fontSize: 12,
               fontWeight: FontWeight.w600,
               letterSpacing: 1.5,
@@ -195,7 +197,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                 ? Center(
                     child: Text(
                       'No traffic data yet',
-                      style: TextStyle(color: textColor.withValues(alpha: 0.4)),
+                      style: TextStyle(color: textColor.withOpacity(0.4)),
                     ),
                   )
                 : BarChart(
@@ -259,7 +261,7 @@ class _StatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: color, size: 18),
@@ -271,7 +273,7 @@ class _StatCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(color: textColor.withValues(alpha: 0.5), fontSize: 11),
+                  style: TextStyle(color: textColor.withOpacity(0.5), fontSize: 11),
                 ),
                 const SizedBox(height: 2),
                 Text(

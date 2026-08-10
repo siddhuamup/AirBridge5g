@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,7 +55,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
     if (widget.deepLinkHost != null && widget.deepLinkPort != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _manualProxyController.text = '${widget.deepLinkHost}:${widget.deepLinkPort}';
-        _connectToProxy(widget.deepLinkHost!, widget.deepLinkPort!);
+        _connectManually();
       });
     }
   }
@@ -112,7 +114,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
               proxyPort: creds.proxyPort,
             );
             setState(() {
-              _masterNodeName = creds.nodeID.isNotEmpty ? creds.nodeID : 'airbridge-master';
+              _masterNodeName = creds.nodeId.isNotEmpty ? creds.nodeId : 'airbridge-master';
               _connectedProxyHost = '${creds.proxyHost}:${creds.proxyPort}';
               _measuredLatencyMs = 8;
               _isScanning = false;
@@ -285,7 +287,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                 ),
                 actions: [
                   IconButton(
-                    icon: Icon(Icons.settings_rounded, color: AirBridgeColors.clientText.withValues(alpha: 0.5)),
+                    icon: Icon(Icons.settings_rounded, color: AirBridgeColors.clientText.withOpacity(0.5)),
                     onPressed: () => context.push('/settings'),
                   ),
                 ],
@@ -345,7 +347,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AirBridgeColors.clientPrimary.withValues(alpha: 0.1),
+            color: AirBridgeColors.clientPrimary.withOpacity(0.1),
             blurRadius: 30,
             offset: const Offset(0, 10),
           ),
@@ -373,7 +375,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: AirBridgeColors.clientText.withValues(alpha: 0.6),
+              color: AirBridgeColors.clientText.withOpacity(0.6),
               height: 1.5,
             ),
           ),
@@ -390,7 +392,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                   border: Border.all(
                     color: _isScanning
                         ? AirBridgeColors.clientPrimary
-                        : AirBridgeColors.clientPrimary.withValues(alpha: 0.3),
+                        : AirBridgeColors.clientPrimary.withOpacity(0.3),
                     width: 2,
                   ),
                   color: const Color(0xFFF0F7FF),
@@ -419,14 +421,14 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                AirBridgeColors.clientPrimary.withValues(alpha: 0),
+                                AirBridgeColors.clientPrimary.withOpacity(0),
                                 AirBridgeColors.clientPrimary,
-                                AirBridgeColors.clientPrimary.withValues(alpha: 0),
+                                AirBridgeColors.clientPrimary.withOpacity(0),
                               ],
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AirBridgeColors.clientPrimary.withValues(alpha: 0.5),
+                                color: AirBridgeColors.clientPrimary.withOpacity(0.5),
                                 blurRadius: 10,
                                 spreadRadius: 3,
                               ),
@@ -450,7 +452,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                         child: Icon(
                           Icons.camera_alt_rounded,
                           size: 48,
-                          color: AirBridgeColors.clientPrimary.withValues(alpha: 0.3),
+                          color: AirBridgeColors.clientPrimary.withOpacity(0.3),
                         ),
                       ),
 
@@ -523,7 +525,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AirBridgeColors.clientPrimary.withValues(alpha: 0.3),
+              color: AirBridgeColors.clientPrimary.withOpacity(0.3),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -536,7 +538,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
               height: 52,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
               ),
               child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 28),
             ),
@@ -632,7 +634,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AirBridgeColors.masterAccent.withValues(alpha: 0.15),
+            color: AirBridgeColors.masterAccent.withOpacity(0.15),
             blurRadius: 30,
             offset: const Offset(0, 10),
           ),
@@ -645,7 +647,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AirBridgeColors.masterAccent.withValues(alpha: 0.1),
+              color: AirBridgeColors.masterAccent.withOpacity(0.1),
             ),
             child: const Icon(
               Icons.check_circle_rounded,
@@ -668,14 +670,14 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: AirBridgeColors.clientText.withValues(alpha: 0.6),
+              color: AirBridgeColors.clientText.withOpacity(0.6),
             ),
           ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: AirBridgeColors.masterAccent.withValues(alpha: 0.1),
+              color: AirBridgeColors.masterAccent.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Row(
@@ -755,7 +757,7 @@ class _DetailRow extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            color: AirBridgeColors.clientText.withValues(alpha: 0.6),
+            color: AirBridgeColors.clientText.withOpacity(0.6),
             fontSize: 14,
           ),
         ),

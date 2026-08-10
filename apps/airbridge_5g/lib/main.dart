@@ -45,7 +45,7 @@ void main() {
                     'The app encountered an unexpected error.\nPlease restart AirBridge 5G.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.white.withOpacity(0.6),
                       fontSize: 14,
                       decoration: TextDecoration.none,
                     ),

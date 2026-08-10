@@ -49,19 +49,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeController,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isWide ? size.width * 0.1 : 24,
-              vertical: 24,
-            ),
-            child: Column(
-              children: [
-                const SizedBox(height: 40),
-                // Logo & Title
-                _buildHeader(),
-                const SizedBox(height: 16),
-                _buildSubtitle(),
-                const Spacer(flex: 2),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isWide ? size.width * 0.1 : 24,
+                vertical: 24,
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  // Logo & Title
+                  _buildHeader(),
+                  const SizedBox(height: 16),
+                  _buildSubtitle(),
+                  const SizedBox(height: 32),
                 // Role Selection Cards
                 if (isWide)
                   Row(
@@ -79,13 +80,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       _buildClientCard(context),
                     ],
                   ),
-                const Spacer(flex: 3),
+                const SizedBox(height: 32),
                 // Version info
                 _buildFooter(),
                 const SizedBox(height: 16),
               ],
             ),
           ),
+        ),
         ),
       ),
     );
@@ -105,8 +107,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AirBridgeColors.masterAccent.withValues(alpha: glowOpacity),
-                    AirBridgeColors.masterAccent.withValues(alpha: 0),
+                    AirBridgeColors.masterAccent.withOpacity(glowOpacity),
+                    AirBridgeColors.masterAccent.withOpacity(0),
                   ],
                 ),
               ),
@@ -118,7 +120,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     shape: BoxShape.circle,
                     color: AirBridgeColors.masterPrimary,
                     border: Border.all(
-                      color: AirBridgeColors.masterAccent.withValues(alpha: 0.6),
+                      color: AirBridgeColors.masterAccent.withOpacity(0.6),
                       width: 2,
                     ),
                   ),
@@ -151,7 +153,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       'Cross-Platform Network Resilience',
       style: TextStyle(
         fontSize: 16,
-        color: Colors.white.withValues(alpha: 0.6),
+        color: Colors.white.withOpacity(0.6),
         letterSpacing: 1.5,
         fontWeight: FontWeight.w300,
       ),
@@ -201,7 +203,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       'v1.0.0 · Enterprise Network Resilience',
       style: TextStyle(
         fontSize: 12,
-        color: Colors.white.withValues(alpha: 0.3),
+        color: Colors.white.withOpacity(0.3),
       ),
     );
   }
@@ -278,8 +280,8 @@ class _RoleCardState extends State<_RoleCard>
               child: InkWell(
                 onTap: widget.onTap,
                 borderRadius: BorderRadius.circular(20),
-                splashColor: widget.accentColor.withValues(alpha: 0.2),
-                highlightColor: widget.accentColor.withValues(alpha: 0.1),
+                splashColor: widget.accentColor.withOpacity(0.2),
+                highlightColor: widget.accentColor.withOpacity(0.1),
                 child: Container(
                   constraints: const BoxConstraints(minHeight: 180),
                 decoration: BoxDecoration(
@@ -290,14 +292,12 @@ class _RoleCardState extends State<_RoleCard>
                     colors: widget.gradientColors,
                   ),
                   border: Border.all(
-                    color: widget.accentColor.withValues(
-                      alpha: _isHovered ? 0.6 : 0.2,
-                    ),
+                    color: widget.accentColor.withOpacity(_isHovered ? 0.6 : 0.2),
                     width: 1.5,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.glowColor.withValues(alpha: 0.15 + glowSpread * 0.005),
+                      color: widget.glowColor.withOpacity((0.15 + glowSpread * 0.005).clamp(0.0, 1.0)),
                       blurRadius: 20 + glowSpread,
                       spreadRadius: glowSpread / 4,
                     ),
@@ -315,7 +315,7 @@ class _RoleCardState extends State<_RoleCard>
                             height: 48,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: widget.accentColor.withValues(alpha: 0.15),
+                              color: widget.accentColor.withOpacity(0.15),
                             ),
                             child: Icon(
                               widget.icon,
@@ -326,7 +326,7 @@ class _RoleCardState extends State<_RoleCard>
                           const Spacer(),
                           Icon(
                             Icons.arrow_forward_rounded,
-                            color: widget.accentColor.withValues(alpha: 0.6),
+                            color: widget.accentColor.withOpacity(0.6),
                           ),
                         ],
                       ),
@@ -353,7 +353,7 @@ class _RoleCardState extends State<_RoleCard>
                         widget.description,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Colors.white.withValues(alpha: 0.5),
+                          color: Colors.white.withOpacity(0.5),
                           height: 1.4,
                         ),
                       ),
@@ -362,9 +362,10 @@ class _RoleCardState extends State<_RoleCard>
                 ),
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
+    ),
     );
   }
 }

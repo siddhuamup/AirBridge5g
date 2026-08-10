@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:grpc/grpc.dart';
 import 'daemon_client.dart';
@@ -79,14 +80,17 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
     return _retryCall('generateQRCredentials', () async {
       final response =
           await _client.generateQRCredentials(pb.GenerateQRRequest());
+      if (response.qrPayload.isNotEmpty) {
+        return QRCredentials.decode(response.qrPayload);
+      }
       return QRCredentials(
-        nodeId: response.nodeId,
+        nodeId: 'node',
         proxyHost: response.proxyHost,
         proxyPort: response.proxyPort,
         quicPort: response.quicPort,
-        encryptionKey: response.encryptionKey,
+        encryptionKey: base64.encode(response.encryptionKey),
         expiresAt: response.expiresAtUnixMs.toInt(),
-        authToken: response.authToken,
+        authToken: '',
       );
     });
   }
@@ -129,6 +133,21 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
   }
 
   @override
+  Future<TrafficSnapshotData> getTrafficSnapshot() async {
+    return _retryCall('getTrafficSnapshot', () async {
+      final responseStream = _client.streamTrafficStats(
+        pb.StreamTrafficStatsRequest(),
+      );
+      final update = await responseStream.first;
+      return TrafficSnapshotData(
+        bytesIn: update.snapshot.bytesIn.toInt(),
+        bytesOut: update.snapshot.bytesOut.toInt(),
+        activeConnections: update.snapshot.activeConnections.toDouble(),
+      );
+    });
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> getConnectedPeers() async {
     return _retryCall('getConnectedPeers', () async {
       final response = await _client.listPeers(pb.ListPeersRequest());
@@ -150,7 +169,7 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
       final response = await _client.getStatus(pb.GetStatusRequest());
       return DaemonStatus(
         startedAtUnixMs: response.startedAtUnixMs.toInt(),
-        tunnelState: response.state.name,
+        tunnelState: response.tunnelState.name,
       );
     });
   }
@@ -165,9 +184,9 @@ class GrpcDaemonClient implements AirBridgeDaemonClient {
   }) async {
     return _retryCall('setPrivacyConfig', () async {
       final req = pb.SetPrivacyConfigRequest();
-      if (ttlEnabled != null) req.ttlEnabled = ttlEnabled;
-      if (fragmenterEnabled != null) req.fragmenterEnabled = fragmenterEnabled;
-      if (uaHarmonizeEnabled != null) req.uaHarmonizeEnabled = uaHarmonizeEnabled;
+      if (ttlEnabled != null) req.ttlNormalization = ttlEnabled;
+      if (fragmenterEnabled != null) req.packetFragmentation = fragmenterEnabled;
+      if (uaHarmonizeEnabled != null) req.userAgentHarmonization = uaHarmonizeEnabled;
       final response = await _client.setPrivacyConfig(req);
       return response.success;
     });

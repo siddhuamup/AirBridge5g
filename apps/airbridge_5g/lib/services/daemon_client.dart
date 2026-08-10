@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/role_provider.dart';
 import '../utils/crypto_utils.dart';
+export 'grpc_daemon_client.dart';
 
 class DaemonStatus {
   final int startedAtUnixMs;
@@ -13,6 +14,18 @@ class DaemonStatus {
   });
 }
 
+class TrafficSnapshotData {
+  final int bytesIn;
+  final int bytesOut;
+  final double activeConnections;
+
+  const TrafficSnapshotData({
+    this.bytesIn = 0,
+    this.bytesOut = 0,
+    this.activeConnections = 0,
+  });
+}
+
 /// Client interface for communicating with the AirBridge 5G Go Daemon.
 abstract class AirBridgeDaemonClient {
   Future<bool> startTunnel(NodeRole role);
@@ -20,6 +33,7 @@ abstract class AirBridgeDaemonClient {
   Future<QRCredentials> generateQRCredentials();
   Future<bool> connectWithQR(String qrPayload);
   Stream<Map<String, dynamic>> streamTrafficStats();
+  Future<TrafficSnapshotData> getTrafficSnapshot();
   Future<List<Map<String, dynamic>>> getConnectedPeers();
   Future<DaemonStatus> getStatus();
   Future<bool> setPrivacyConfig({
@@ -78,6 +92,15 @@ class LocalDaemonClient implements AirBridgeDaemonClient {
   }
 
   @override
+  Future<TrafficSnapshotData> getTrafficSnapshot() async {
+    return TrafficSnapshotData(
+      bytesIn: _isRunning ? 1024 * 1024 * 15 : 0,
+      bytesOut: _isRunning ? 1024 * 1024 * 5 : 0,
+      activeConnections: _isRunning ? 3.0 : 0.0,
+    );
+  }
+
+  @override
   Stream<Map<String, dynamic>> streamTrafficStats() {
     return Stream.periodic(const Duration(milliseconds: 500), (count) {
       return {
@@ -90,8 +113,12 @@ class LocalDaemonClient implements AirBridgeDaemonClient {
   }
 
   @override
-  Future<int> getConnectedPeers() async {
-    return _isRunning ? 3 : 0;
+  Future<List<Map<String, dynamic>>> getConnectedPeers() async {
+    if (!_isRunning) return [];
+    return [
+      {'id': 'peer-1', 'endpoint': '192.168.1.101', 'platform': 'android', 'latency_ms': 12.5},
+      {'id': 'peer-2', 'endpoint': '192.168.1.102', 'platform': 'ios', 'latency_ms': 18.2},
+    ];
   }
 
   @override
@@ -117,5 +144,5 @@ class LocalDaemonClient implements AirBridgeDaemonClient {
 }
 
 
-export 'grpc_daemon_client.dart';
+
 
